@@ -192,6 +192,7 @@
     font:400 13px/32px ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
   }
   .holder-ca::placeholder { color:var(--text-dim); opacity:1; }
+  .holder-ca[readonly] { cursor:default; }
   .holder-ctl { display:inline-flex; cursor:not-allowed; }
   .holder-scan {
     height:32px; padding:0 12px; background:var(--accent); color:var(--bg); border:1px solid var(--accent);
@@ -365,7 +366,7 @@
     </div>
     <form id="holder-form" class="holder-sample" method="get" action="#" autocomplete="off">
       <span id="holder-sample-pill" class="sample-pill" hidden></span>
-      <input id="holder-ca" class="holder-ca" type="text" autocomplete="off" spellcheck="false" maxlength="128" autocapitalize="off">
+      <input id="holder-ca" class="holder-ca" type="text" autocomplete="off" spellcheck="false" maxlength="128" autocapitalize="off" readonly aria-readonly="true">
       <span class="holder-ctl" id="holder-scan-wrap"><button id="holder-scan" class="holder-scan" type="submit" disabled aria-disabled="true"></button></span>
       <span class="holder-ctl" id="holder-try-wrap"><button id="holder-try" class="holder-try" type="button" disabled aria-disabled="true"></button></span>
       <p id="holder-help" class="holder-help"></p>
@@ -1067,29 +1068,43 @@ function hms(ts) {
   const p = (n) => String(n).padStart(2, "0");
   return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
 }
-function fillReason(template, pct) {
-  return template.replace(/\{(top10_pct|max_pct|dev_pct)\}/g, (_, key) => {
-    const v = pct && pct[key];
-    return typeof v === "number" ? String(v) : "—";
-  });
+function templateSpec(verdict, pct) {
+  const has = (key) => typeof (pct && pct[key]) === "number";
+  if (verdict === "OK") {
+    if (has("max_pct")) return { template: COPY.reasons.OK_MILD, keys: ["top10_pct", "max_pct"] };
+    return { template: COPY.reasons.OK_NONE, keys: ["top10_pct"] };
+  }
+  if (verdict === "RISKY") {
+    if (has("dev_pct")) return { template: COPY.reasons.RISKY_DEV, keys: ["top10_pct", "dev_pct"] };
+    return { template: COPY.reasons.RISKY, keys: ["top10_pct", "max_pct"] };
+  }
+  if (verdict === "DANGER") return { template: COPY.reasons.DANGER, keys: ["top10_pct", "max_pct"] };
+  return null;
 }
-function reasonFromTemplate(view) {
+function filledTemplate(view) {
+  const spec = templateSpec(view.verdict, view.pct);
+  if (!spec) return "";
   const pct = view.pct || {};
-  let template = COPY.reasons.OK_NONE;
-  if (view.verdict === "OK") template = pct.max_pct != null ? COPY.reasons.OK_MILD : COPY.reasons.OK_NONE;
-  else if (view.verdict === "RISKY") template = pct.dev_pct != null ? COPY.reasons.RISKY_DEV : COPY.reasons.RISKY;
-  else if (view.verdict === "DANGER") template = COPY.reasons.DANGER;
-  const line = fillReason(template, pct);
-  return line && line.trim() ? line : COPY.insufficient;
+  for (const key of spec.keys) {
+    if (typeof pct[key] !== "number") return "";
+  }
+  return spec.template.replace(/\{(top10_pct|max_pct|dev_pct)\}/g, (_, key) => String(pct[key]));
+}
+function shownCall(view) {
+  if (view.state !== "done" || !view.verdict) return false;
+  const reason = typeof view.reason === "string" ? view.reason.trim() : "";
+  if (reason) return true;
+  return !!filledTemplate(view);
 }
 function reasonLine(view) {
   if (view.state === "scanning") return COPY.scanning;
   if (view.state === "error") return COPY.error;
-  if (view.state === "insufficient") return COPY.insufficient;
+  if (view.state === "insufficient" || (view.state === "done" && !shownCall(view))) return COPY.insufficient;
   if (view.state === "done" && view.verdict) {
     const reason = typeof view.reason === "string" ? view.reason.trim() : "";
     if (reason) return reason;
-    return reasonFromTemplate(view);
+    const line = filledTemplate(view);
+    if (line) return line;
   }
   if (view.state === "done") return COPY.insufficient;
   return COPY.scansLater;
@@ -1142,7 +1157,8 @@ function renderCrawlerLog(view) {
 function renderHolder(view) {
   const strip = $("#holder-strip");
   if (!strip) return;
-  const state = view.state || "idle";
+  const called = shownCall(view);
+  const state = called ? "done" : (view.state === "done" ? "insufficient" : (view.state || "idle"));
   strip.classList.toggle("is-idle", state === "idle");
   strip.classList.toggle("is-scanning", state === "scanning");
   strip.classList.toggle("is-done", state === "done");
@@ -1150,7 +1166,7 @@ function renderHolder(view) {
   strip.classList.toggle("is-insufficient", state === "insufficient");
   syncDeskHolderSignal(view);
   strip.setAttribute("aria-busy", state === "scanning" ? "true" : "false");
-  const active = state === "done" ? view.verdict : "";
+  const active = called ? view.verdict : "";
   document.querySelectorAll("#holder-chips .chip").forEach(chip => {
     const on = !!active && chip.dataset.v === active;
     chip.classList.toggle("is-on", on);
@@ -1158,7 +1174,7 @@ function renderHolder(view) {
     else chip.removeAttribute("aria-current");
   });
   const score = $("#holder-score");
-  if (state === "done" && typeof view.score === "number") {
+  if (called && typeof view.score === "number") {
     score.hidden = false;
     score.textContent = String(Math.round(view.score));
   } else {
@@ -1170,10 +1186,7 @@ function renderHolder(view) {
   reason.title = COPY.tooltip;
   renderCrawlerLog(view);
   renderSamplePill();
-  // No CA endpoint yet. Stay disabled even when a paper row is on screen.
-  const scanBtn = $("#holder-scan"), tryBtn = $("#holder-try");
-  if (scanBtn) { scanBtn.disabled = true; scanBtn.setAttribute("aria-disabled", "true"); }
-  if (tryBtn) { tryBtn.disabled = true; tryBtn.setAttribute("aria-disabled", "true"); }
+  lockAddressScan();
 }
 function mountHolderCopy() {
   $("#holder-label").textContent = COPY.stripTitle;
@@ -1193,12 +1206,9 @@ function mountHolderCopy() {
   const scanBtn = $("#holder-scan"), tryBtn = $("#holder-try");
   scanBtn.textContent = COPY.scan;
   tryBtn.textContent = COPY.trySample;
-  scanBtn.disabled = true;
-  tryBtn.disabled = true;
-  scanBtn.setAttribute("aria-disabled", "true");
-  tryBtn.setAttribute("aria-disabled", "true");
   $("#holder-scan-wrap").title = COPY.scansPending;
   $("#holder-try-wrap").title = COPY.scansPending;
+  lockAddressScan();
   const pill = $("#holder-sample-pill");
   pill.textContent = COPY.samplePill;
   pill.title = COPY.sampleTooltip;
@@ -1230,9 +1240,18 @@ function renderSamplePill() {
   pill.textContent = COPY.samplePill;
   pill.title = COPY.sampleTooltip;
 }
+function lockAddressScan() {
+  const scanBtn = $("#holder-scan"), tryBtn = $("#holder-try"), ca = $("#holder-ca");
+  if (scanBtn) { scanBtn.disabled = true; scanBtn.setAttribute("aria-disabled", "true"); }
+  if (tryBtn) { tryBtn.disabled = true; tryBtn.setAttribute("aria-disabled", "true"); }
+  if (ca && scanBtn && scanBtn.disabled && tryBtn && tryBtn.disabled) {
+    ca.readOnly = true;
+    ca.setAttribute("aria-readonly", "true");
+  }
+}
 function syncDeskHolderSignal(view) {
   const root = document.body;
-  const pause = view.state === "done" && (view.verdict === "RISKY" || view.verdict === "DANGER");
+  const pause = shownCall(view) && (view.verdict === "RISKY" || view.verdict === "DANGER");
   const sig = pause ? view.verdict : "";
   if (pause) {
     root.dataset.holderRisk = view.verdict;
