@@ -15,6 +15,8 @@ TRADE_MODULES = [
     ROOT / "desk.py",
     ROOT / "gates.py",
     ROOT / "sources.py",
+    ROOT / "watchlist.py",
+    ROOT / "scoreboard.py",
     ROOT / "dashboard" / "server.py",
 ]
 

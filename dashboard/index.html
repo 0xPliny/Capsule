@@ -178,6 +178,19 @@
   a.hdr-link { color:var(--text); text-decoration:none; font-weight:var(--w-strong); font-size:13px;
                padding:6px 10px; border:1px solid var(--line); border-radius:var(--radius); }
   a.hdr-link:hover { color:var(--accent); border-color:var(--accent); }
+  .role { display:inline-block; margin-left:6px; color:var(--dim); border:1px solid var(--line);
+          border-radius:var(--radius); padding:0 5px; font-size:10px; letter-spacing:.04em; vertical-align:1px; }
+  .miss { color:var(--dim); }
+  .paper-strip { margin:0 0 8px; color:var(--text); font-weight:var(--w-strong); letter-spacing:.04em; font-size:12px; }
+  .watch-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 8px; }
+  .watch-row input[type="text"] { background:var(--bg); color:var(--text); border:1px solid var(--line);
+          border-radius:var(--radius); padding:6px 8px; font:var(--w) 13px/1.2 ui-monospace,Menlo,Consolas,monospace; min-width:12em; flex:1; }
+  button.quiet { background:transparent; color:var(--text); border:1px solid var(--line); border-radius:var(--radius);
+          padding:6px 10px; font:var(--w-strong) 12px/1 system-ui,"Segoe UI",sans-serif; cursor:pointer; }
+  button.quiet:hover { border-color:var(--accent); color:var(--accent); }
+  button.quiet:disabled { opacity:.55; cursor:wait; }
+  #watch-list { list-style:none; margin:0; padding:0; }
+  #watch-list li { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid var(--line); }
   @media (prefers-reduced-motion: reduce) { .pop, .ripple, #bubble .txt::after, .typing i { animation:none; } }
 </style>
 </head>
@@ -288,8 +301,28 @@
 
   <section class="card c12">
     <h2>Evidence</h2>
-    <p class="ev-note dim">Each gate names the source, the fetch, the snapshot hash, and how close the value sits to the line.</p>
+    <p class="ev-note dim">Each gate names the source, the fetch, the snapshot hash, and how close the value sits to the line. Numbers are tagged observed, derived, or cited. A missing number stays insufficient.</p>
     <div id="evidence"></div>
+  </section>
+
+  <section class="card c12" id="watchlist">
+    <h2>Watchlist</h2>
+    <p class="paper-strip">DRY RUN · PAPER</p>
+    <p class="ev-note dim">Saved mints only. A refresh appends a Decision. It does not send an order.</p>
+    <form id="watch-form" class="watch-row">
+      <input id="watch-mint" type="text" name="mint" autocomplete="off" spellcheck="false" placeholder="mint" aria-label="mint to watch">
+      <button class="quiet" type="submit">Add mint</button>
+      <button class="quiet" id="watch-once" type="button">Refresh once</button>
+      <label class="dim"><input id="watch-timer" type="checkbox"> Paper timer</label>
+    </form>
+    <ul id="watch-list"></ul>
+  </section>
+
+  <section class="card c12" id="scoreboard">
+    <h2>Paper scoreboard</h2>
+    <p class="paper-strip">DRY RUN · PAPER</p>
+    <p class="ev-note dim">Each dry-run records entry price and time. After the horizon, a later print fills the paper delta. Missing prices stay insufficient. No orders.</p>
+    <div id="scoreboard-body"></div>
   </section>
 
   <section class="card c12">
@@ -355,6 +388,16 @@ function endpointList(row) {
 }
 function hashText(row, g) {
   return (g && g.snapshot_hash) || (row && row.snapshot_hash) || "";
+}
+function roleTag(role) {
+  if (!role) return "";
+  const insuff = role === "insufficient";
+  return ` <span class="role${insuff ? " insufficient" : ""}">${esc(role)}</span>`;
+}
+function roleOf(g, key) {
+  const roles = (g && g.roles) || {};
+  if (roles[key]) return roles[key];
+  return g && g[key] != null ? "" : "insufficient";
 }
 
 function actionClass(a) { if (!a) return "dim"; if (a.startsWith("paper_")) return "ok"; if (a.includes("flatten")) return "bad"; return "warn"; }
@@ -423,9 +466,13 @@ function renderEvidence(row, entries) {
     const mark = g.passed == null ? "—" : g.passed ? "PASS" : "FAIL";
     const cls = g.passed == null ? "" : g.passed ? "pass" : "fail";
     const op = OP_SYM[g.op] || g.op || "";
-    const threshold = g.threshold == null ? "—" : `${op ? op + " " : ""}${g.threshold}`;
+    const thRole = roleOf(g, "threshold");
+    const valRole = roleOf(g, "value");
+    const distRole = roleOf(g, "distance");
+    const threshold = thRole === "insufficient" ? "insufficient" : `${op ? op + " " : ""}${g.threshold}`;
     const digest = hashText(row, g);
-    const dist = g.distance == null ? "—" : g.distance;
+    const dist = distRole === "insufficient" ? "insufficient" : g.distance;
+    const valueShown = valRole === "insufficient" ? "insufficient" : g.value;
     const epHtml = eps.length ? `<div>endpoint</div><div class="mono">${eps.map(e => {
       const where = e.url || e.name || g.endpoint || row.source || "—";
       const flag = e.ok === false ? `<span class="bad">FAIL ${esc(e.error || "")}</span>` : `<span class="ok">ok</span>`;
@@ -441,15 +488,63 @@ function renderEvidence(row, entries) {
         <div>decided</div><div>${esc(tlocal(g.decided_at || row.ts))}</div>
         <div>snapshot</div><div class="mono">${digest ? esc(digest) : "—"}</div>
         <div>field</div><div class="mono">${esc(g.field || g.name)}</div>
-        <div>threshold</div><div class="mono">${esc(threshold)}</div>
-        <div>value</div><div class="mono">${g.value == null ? "—" : esc(g.value)}</div>
+        <div>threshold</div><div class="${thRole === "insufficient" ? "miss" : "mono"}">${esc(threshold)}${roleTag(thRole)}</div>
+        <div>value</div><div class="${valRole === "insufficient" ? "miss" : "mono"}">${esc(valueShown)}${roleTag(valRole)}</div>
         <div>result</div><div class="${cls}">${mark}</div>
-        <div>distance</div><div class="mono">${esc(dist)}</div>
+        <div>distance</div><div class="${distRole === "insufficient" ? "miss" : "mono"}">${esc(dist)}${roleTag(distRole)}</div>
         <div>flip</div><div>${esc(g.flip || "—")}</div>
         <div>reason</div><div>${esc(gateReason(g))}</div>
       </div>
     </article>`;
   }).join("");
+}
+
+function paperCell(mark) {
+  if (!mark || mark.status === "insufficient") return `<span class="dim">insufficient</span>`;
+  if (mark.status === "open" || mark.paper_delta == null) return `<span class="dim">open</span>`;
+  const v = Number(mark.paper_delta);
+  const cls = v > 0 ? "ok" : v < 0 ? "bad" : "dim";
+  const sign = v > 0 ? "+" : "";
+  return `<span class="${cls} mono">${sign}${(v * 100).toFixed(2)}%</span>`;
+}
+function renderWatchlist(payload) {
+  const list = $("#watch-list");
+  if (!list) return;
+  const mints = (payload && payload.mints) || [];
+  list.innerHTML = mints.length ? mints.map(m => `<li>
+    <span class="mono">${mintLink(m.mint)}</span>
+    <span class="dim">${esc(tlocal(m.added_at))}</span>
+    <button type="button" class="quiet watch-remove" data-mint="${esc(m.mint)}">Remove</button>
+  </li>`).join("") : `<li class="dim">No mints saved.</li>`;
+}
+function renderScoreboard(payload) {
+  const box = $("#scoreboard-body");
+  if (!box) return;
+  const marks = (payload && payload.marks) || [];
+  if (!marks.length) {
+    box.innerHTML = `<p class="dim">No paper marks yet.</p>`;
+    return;
+  }
+  box.innerHTML = `<div style="overflow-x:auto"><table><thead><tr>
+    <th>mint</th><th>action</th><th>entry</th><th>exit</th><th>paper Δ</th><th>status</th><th>horizon</th>
+  </tr></thead><tbody>${marks.map(m => {
+    const insuff = m.status === "insufficient";
+    return `<tr class="${insuff ? "dim" : ""}">
+      <td class="mono">${m.mint ? mintLink(m.mint, shortMint(m.mint)) : "—"}</td>
+      <td class="${actionClass(m.action)}">${esc(m.action)}</td>
+      <td class="mono">${insuff && m.entry_px == null ? "insufficient" : px(m.entry_px)}</td>
+      <td class="mono">${m.exit_px == null ? (insuff ? "insufficient" : "—") : px(m.exit_px)}</td>
+      <td>${paperCell(m)}</td>
+      <td class="${insuff ? "dim" : ""}">${esc(m.status)}</td>
+      <td class="mono">${m.horizon_min == null ? "—" : esc(m.horizon_min) + "m"}</td>
+    </tr>`;
+  }).join("")}</tbody></table></div>`;
+}
+async function postJson(url, body) {
+  const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : "{}"});
+  const j = await r.json();
+  if (!r.ok || j.ok === false) throw new Error(j.error || j.stderr_tail || ("http " + r.status));
+  return j;
 }
 
 function renderLogs(rows) {
@@ -870,14 +965,60 @@ function startDust() {
 let lastTs;
 async function refresh(forceTour) {
   try {
-    const [latest, logs] = await Promise.all([fetch("/api/latest").then(r => r.json()), fetch("/api/logs").then(r => r.json())]);
-    renderPanels(latest.row); renderLogs(logs.rows);
+    const [latest, logs, watch, board] = await Promise.all([
+      fetch("/api/latest").then(r => r.json()),
+      fetch("/api/logs").then(r => r.json()),
+      fetch("/api/watchlist").then(r => r.json()),
+      fetch("/api/scoreboard").then(r => r.json()),
+    ]);
+    renderPanels(latest.row); renderLogs(logs.rows); renderWatchlist(watch); renderScoreboard(board);
     const ts = latest.row && latest.row.ts;
     if (forceTour || ts !== lastTs) { lastTs = ts; tour(latest.row); }
     $("#stage").classList.toggle("busy", !!latest.running || $("#run").disabled);
     if (latest.running) $("#status").textContent = "dry-run cycle running…";
   } catch (e) { $("#status").textContent = "dashboard fetch error: " + e; }
 }
+
+$("#watch-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const mint = $("#watch-mint").value.trim();
+  if (!mint) return;
+  try {
+    await postJson("/api/watchlist", {op:"add", mint});
+    $("#watch-mint").value = "";
+    $("#status").textContent = "watchlist saved · DRY RUN · PAPER · live_order false";
+    await refresh(false);
+  } catch (e) { $("#status").textContent = "watchlist: " + e.message; }
+});
+$("#watch-list").addEventListener("click", async (ev) => {
+  const btn = ev.target.closest(".watch-remove");
+  if (!btn) return;
+  try {
+    await postJson("/api/watchlist", {op:"remove", mint: btn.getAttribute("data-mint")});
+    $("#status").textContent = "watchlist updated · DRY RUN · PAPER · live_order false";
+    await refresh(false);
+  } catch (e) { $("#status").textContent = "watchlist: " + e.message; }
+});
+$("#watch-once").addEventListener("click", async () => {
+  const b = $("#watch-once"); b.disabled = true;
+  $("#status").textContent = "paper watch pass (dry-run, no orders)…";
+  try {
+    const j = await postJson("/api/watch");
+    $("#status").textContent = `paper watch · appended ${j.appended} · live_order ${j.live_order}`;
+    await refresh(true);
+  } catch (e) { $("#status").textContent = "paper watch: " + e.message; }
+  b.disabled = false;
+});
+let watchTimer = null;
+$("#watch-timer").addEventListener("change", (ev) => {
+  if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
+  if (!ev.target.checked) {
+    $("#status").textContent = "paper timer off · DRY RUN · PAPER";
+    return;
+  }
+  $("#status").textContent = "paper timer on · DRY RUN · PAPER · no orders";
+  watchTimer = setInterval(() => { $("#watch-once").click(); }, 60000);
+});
 
 $("#run").addEventListener("click", async () => {
   const b = $("#run"); b.disabled = true; $("#status").textContent = "running desk.py --pump (dry-run)…"; $("#stage").classList.add("busy");
