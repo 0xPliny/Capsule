@@ -111,7 +111,7 @@ Windows `run.bat` is not in this repo yet — use the commands above.
 
 ## Creator
 
-**Created and maintained by [0xPliny](https://x.com/0xPliny)** (Chase Logan).
+**Created and maintained by [0xPliny](https://x.com/0xPliny)**.
 
 If Capsule helped you catch a gate snap before real money moved — that’s the point. Issues and PRs welcome.
 
@@ -119,7 +119,7 @@ If Capsule helped you catch a gate snap before real money moved — that’s the
 
 ## License
 
-Copyright © 2026 Chase Logan / 0xPliny.
+Copyright © 2026 0xPliny.
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
 
