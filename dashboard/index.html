@@ -3,195 +3,177 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Capsule · $CAPS · dry-run desk</title>
+<title>Capsule · $CAPS · paper desk (dry-run)</title>
 <style>
-  :root { --bg:#020205; --panel:#05060c; --line:#0f2a33; --text:#dff8ff; --dim:#5f8a96;
-          --ok:#2bffb0; --bad:#ff2b4e; --warn:#ffc23d; --cyan:#00f0ff; --mag:#ff2bd6; --amber:#ffc23d; }
+  /* One accent, one border, one radius, two weights. Paper desk — not a live terminal. */
+  :root {
+    --bg:#0E1311; --panel:#161C19; --stage:#121816; --line:#3A453F;
+    --text:#E7E4DE; --dim:#8E9791; --accent:#86efac; --ink:#143024;
+    --ok:#86efac; --bad:#E08A82; --warn:#C6B48A;
+    --radius:6px; --w:400; --w-strong:600;
+  }
   * { box-sizing:border-box; }
-  html, body { background:var(--bg); }
-  body { margin:0; color:var(--text); font:13.5px/1.45 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace; }
-  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px; padding:12px 22px;
-           background:rgba(2,2,5,.86); backdrop-filter:blur(10px); border-bottom:1px solid rgba(0,240,255,.22); flex-wrap:wrap;
-           box-shadow:0 1px 18px rgba(0,240,255,.08); }
-  .logo { width:30px; height:30px; display:block; filter:drop-shadow(0 0 4px rgba(159,212,192,.85)); }
-  h1 { font-size:16px; margin:0; letter-spacing:2px; font-weight:800; text-transform:uppercase; color:#fff; text-shadow:0 0 8px rgba(0,240,255,.7); }
-  .sub { color:var(--cyan); font-size:11.5px; margin-right:6px; letter-spacing:1.5px; text-transform:uppercase; opacity:.8; }
-  .badge { font:700 11px/1 ui-monospace,Menlo,monospace; padding:6px 9px; border-radius:2px; border:1px solid; text-transform:uppercase; letter-spacing:.8px; }
-  .b-ok { color:var(--ok); border-color:rgba(43,255,176,.55); background:rgba(43,255,176,.06); box-shadow:0 0 8px rgba(43,255,176,.2); }
-  .b-bad { color:var(--bad); border-color:rgba(255,43,78,.7); background:rgba(255,43,78,.08); box-shadow:0 0 8px rgba(255,43,78,.3); }
-  .b-dim { color:var(--dim); border-color:var(--line); background:#060a10; }
-  .b-warn { color:var(--warn); border-color:rgba(255,194,61,.55); background:rgba(255,194,61,.06); }
+  html, body { background:var(--bg); color:var(--text); }
+  body { margin:0; font:var(--w) 14px/1.45 system-ui,"Segoe UI",sans-serif; }
+  :focus-visible { outline:1px solid var(--accent); outline-offset:2px; }
+  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; padding:12px 22px;
+           background:var(--bg); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .logo { width:28px; height:28px; display:block; flex:0 0 auto; }
+  .brand { min-width:0; }
+  h1 { font-size:16px; margin:0; font-weight:var(--w-strong); letter-spacing:0; color:var(--text); }
+  .sub { margin:1px 0 0; color:var(--dim); font-size:12px; font-weight:var(--w); }
+  .mode-badge { flex:0 0 auto; margin:0; color:var(--ink); background:var(--accent); border:1px solid var(--accent);
+                border-radius:var(--radius); padding:6px 10px; font-size:12px; font-weight:var(--w-strong);
+                letter-spacing:.04em; line-height:1; white-space:nowrap; }
+  .affil { margin:0; color:var(--dim); font-size:12px; font-weight:var(--w); }
+  .affil a { color:var(--text); }
+  .status-pill { color:var(--dim); border:1px solid var(--line); background:transparent; border-radius:var(--radius);
+                 padding:5px 8px; font-size:12px; font-weight:var(--w-strong); white-space:nowrap; }
+  .status-pill.is-bad { color:var(--bad); border-color:var(--bad); }
   .spacer { flex:1; }
-  button#run { background:transparent; color:var(--cyan); border:1px solid var(--cyan); padding:8px 18px; border-radius:2px;
-               font:800 12px ui-monospace,Menlo,monospace; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer;
-               box-shadow:0 0 10px rgba(0,240,255,.35), inset 0 0 10px rgba(0,240,255,.15); text-shadow:0 0 6px var(--cyan); transition:all .15s; }
-  button#run:hover { background:rgba(0,240,255,.12); color:#fff; border-color:var(--mag); box-shadow:0 0 16px rgba(255,43,214,.5), inset 0 0 12px rgba(255,43,214,.2); }
-  button#run:disabled { opacity:.5; cursor:wait; }
+  button#run { background:var(--accent); color:var(--ink); border:1px solid var(--accent); padding:8px 14px;
+               border-radius:var(--radius); font:var(--w-strong) 13px/1 system-ui,"Segoe UI",sans-serif; cursor:pointer; }
+  button#run:hover { background:#9af6bb; }
+  button#run:disabled { opacity:.55; cursor:wait; }
   #status { color:var(--dim); font-size:12px; }
 
-  /* ---------------------------------------------------------------- stage */
-  #stage { position:relative; height:clamp(420px, 40vw, 540px); margin:16px 22px 0; border-radius:4px; overflow:hidden;
-           border:1px solid rgba(0,240,255,.25); background:
-             linear-gradient(rgba(0,240,255,.035) 1px, transparent 1px) 0 0/40px 40px,
-             linear-gradient(90deg, rgba(0,240,255,.035) 1px, transparent 1px) 0 0/40px 40px,
-             radial-gradient(ellipse 70% 80% at 50% 50%, rgba(0,40,60,.35), transparent 75%), #020206;
-           box-shadow: inset 0 0 90px rgba(0,0,0,.9), 0 0 24px rgba(0,240,255,.07); }
-  #stage::after { content:""; position:absolute; inset:0; pointer-events:none; z-index:2;
-           background:repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px); }
+  #stage { position:relative; height:clamp(340px, 36vw, 440px); margin:16px 22px 0; border-radius:var(--radius); overflow:hidden;
+           border:1px solid var(--line); background:var(--stage); }
+  #stage::before { content:""; position:absolute; inset:0; pointer-events:none;
+           background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+           background-size:48px 48px; opacity:.45; }
   #dust, #web { position:absolute; inset:0; width:100%; height:100%; display:block; }
-  .hud { position:absolute; z-index:3; font:700 11px/1.2 ui-monospace,Menlo,monospace; color:var(--dim); letter-spacing:.8px; pointer-events:none; text-transform:uppercase; }
-  .hud.tl { top:14px; left:18px; } .hud.tr { top:14px; right:18px; text-align:right; }
-  .hud.bl { bottom:12px; left:18px; } .hud.br { bottom:12px; right:18px; text-align:right; }
-  .hud .title { color:var(--cyan); font:800 13px/1.2 ui-monospace,Menlo,monospace; letter-spacing:2px; text-shadow:0 0 8px var(--cyan); }
-  .hud .title b { color:var(--mag); text-shadow:0 0 8px var(--mag); }
-  #hud-coin { color:#bfefff; }
-  #prog { width:160px; height:3px; background:#071820; margin-top:7px; overflow:hidden; margin-left:auto; }
-  #prog i { display:block; height:100%; width:0; background:linear-gradient(90deg,var(--mag),var(--cyan)); transition:width .5s; box-shadow:0 0 8px var(--cyan); }
-  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin:0 5px 0 12px; vertical-align:-1px; }
-  .dash { display:inline-block; width:14px; height:2px; margin:0 5px 0 12px; vertical-align:2px; }
+  .hud { position:absolute; z-index:3; font-size:12px; font-weight:var(--w); color:var(--dim); pointer-events:none; }
+  .hud.tl { top:12px; left:14px; } .hud.tr { top:12px; right:14px; text-align:right; }
+  .hud.bl { bottom:12px; left:14px; right:150px; display:flex; gap:10px 12px; flex-wrap:wrap; }
+  .hud.br { bottom:12px; right:14px; width:136px; text-align:right; }
+  .paper-note { color:var(--text); font-weight:var(--w-strong); letter-spacing:.04em; }
+  .hud .title { color:var(--text); font-size:13px; font-weight:var(--w-strong); }
+  #hud-coin { color:var(--dim); margin-top:3px; }
+  #prog { width:140px; height:4px; background:var(--line); margin-top:8px; overflow:hidden; margin-left:auto; border-radius:var(--radius); }
+  #prog i { display:block; height:100%; width:0; background:var(--accent); border-radius:var(--radius); transition:width .4s; }
+  .key { display:inline-flex; align-items:center; gap:6px; }
+  .swatch { width:14px; height:2px; background:var(--dim); display:inline-block; }
+  .swatch.node { width:7px; height:7px; border-radius:var(--radius); background:var(--dim); }
+  .swatch.pass { background:var(--accent); } .swatch.fail { background:var(--bad); } .swatch.path { background:var(--accent); }
 
-  /* mesh (background crawl graph) */
-  .medge { stroke:var(--cyan); stroke-width:.8; opacity:.16; }
-  .mnode { fill:var(--mag); opacity:.55; }
-  .mnode.blip { animation:blip 3.4s ease-in-out infinite; }
-  @keyframes blip { 0%,100% { opacity:.25; } 50% { opacity:1; } }
-  #stage.busy #mesh { animation:meshpulse 1s ease-in-out infinite; }
-  @keyframes meshpulse { 50% { opacity:.4; } }
+  #web text { font-family:system-ui,"Segoe UI",sans-serif; }
+  .medge { stroke:var(--line); stroke-width:1; opacity:1; }
+  .mnode { fill:var(--dim); opacity:.4; }
+  .edge { stroke:var(--line); stroke-width:1.25; opacity:1; transition:stroke .3s, stroke-width .3s; }
+  .edge.lit { stroke:var(--accent); stroke-width:1.75; }
+  #trail { fill:none; stroke:var(--accent); stroke-width:1.5; stroke-linejoin:round; opacity:.8; }
+  .gstrand { stroke:var(--line); stroke-width:1.5; opacity:1; transition:stroke .3s, stroke-width .3s, transform .35s, opacity .4s; transform-box:view-box; }
+  .gstrand.pass { stroke:var(--accent); stroke-width:2; }
+  .gstrand.fail { stroke:var(--bad); stroke-width:2; }
 
-  /* tour graph edges */
-  .edge { stroke:var(--cyan); stroke-width:1.1; opacity:.32; transition:opacity .4s, stroke-width .4s; }
-  .edge.lit { opacity:1; stroke-width:1.6; filter:url(#neon); }
-  #trail { fill:none; stroke:var(--mag); stroke-width:1.8; stroke-linejoin:miter; opacity:.95; stroke-dasharray:6 6; animation:flow .9s linear infinite; filter:url(#neon); }
-  @keyframes flow { to { stroke-dashoffset:-24; } }
-
-  .gstrand { stroke:var(--cyan); stroke-width:1.3; opacity:.4; stroke-dasharray:2 5;
-             transition:stroke .35s, stroke-width .35s, transform .7s cubic-bezier(.3,1.8,.5,1), opacity .9s; transform-box:view-box; }
-  .gstrand.pass { stroke:var(--ok); stroke-width:2.4; opacity:1; filter:url(#neon); stroke-dasharray:8 4; animation:flow .8s linear infinite; }
-  .gstrand.fail { stroke:var(--bad); stroke-width:2.2; opacity:1; filter:url(#neon); stroke-dasharray:none; }
-
-  /* nodes + label boxes */
-  .node .dotn { fill:var(--mag); transition:r .3s; }
-  .node.visit .dotn { filter:url(#neonMag); }
-  .node .ringn { fill:none; stroke:var(--bad); stroke-width:1.6; opacity:0; }
-  .node.fail .ringn { opacity:1; filter:url(#neon); animation:alarm 1s ease-in-out infinite; }
-  @keyframes alarm { 50% { opacity:.35; } }
-  .node .lead { stroke:var(--cyan); stroke-width:.9; opacity:.45; }
-  .node .box { fill:rgba(2,8,14,.86); stroke:rgba(0,240,255,.28); stroke-width:1; transition:stroke .3s, opacity .3s; }
-  .node.visit .box { stroke:var(--cyan); filter:url(#neon); }
-  .node.pass .box { stroke:var(--ok); } .node.fail .box { stroke:var(--bad); }
-  .node .k { fill:var(--dim); font:700 9.5px ui-monospace,Menlo,monospace; letter-spacing:1.2px; text-transform:uppercase; }
-  .node.visit .k { fill:var(--cyan); }
-  .node .v { fill:var(--text); font:700 13px ui-monospace,Menlo,monospace; }
-  .node.pass .v { fill:var(--ok); } .node.fail .v, .node.err .v { fill:var(--bad); }
-  .card-bg { fill:rgba(2,8,14,.9); stroke:rgba(0,240,255,.45); stroke-width:1.1; }
-  .node.visit .card-bg { stroke:var(--cyan); filter:url(#neon); }
-  .card-name { fill:#fff; font:800 15px ui-monospace,Menlo,monospace; }
-  .card-at { fill:var(--cyan); font:12px ui-monospace,Menlo,monospace; opacity:.8; }
-  .card-line { fill:#bfefff; font:600 12px ui-monospace,Menlo,monospace; }
-  .card-av { font:800 16px ui-monospace,Menlo,monospace; fill:var(--mag); }
-  .card-tag { fill:var(--mag); font:700 9px ui-monospace,Menlo,monospace; letter-spacing:1.5px; }
-  .act-text { font:900 21px ui-monospace,Menlo,monospace; letter-spacing:2px; text-transform:uppercase; fill:var(--text); }
-  .act-sub { fill:var(--dim); font:11px ui-monospace,Menlo,monospace; }
-  .node.act.ok .box { stroke:var(--ok); } .node.act.ok .act-text { fill:var(--ok); }
+  .node .dotn { fill:var(--dim); }
+  .node.visit .dotn { fill:var(--accent); }
+  .node .ringn { fill:none; stroke:var(--bad); stroke-width:1.25; opacity:0; }
+  .node.fail .ringn, .node.act.bad .ringn { opacity:1; }
+  .node .lead { stroke:var(--line); stroke-width:1; opacity:1; }
+  .node .box { fill:var(--panel); stroke:var(--line); stroke-width:1; }
+  .node.visit .box, .node.visit .card-bg { stroke:var(--accent); }
+  .node.pass .box { stroke:var(--accent); } .node.fail .box { stroke:var(--bad); }
+  .node .k { fill:var(--dim); font-size:10px; font-weight:var(--w-strong); letter-spacing:.04em; }
+  .node.visit .k { fill:var(--accent); }
+  .node .v { fill:var(--text); font-size:13px; font-weight:var(--w-strong); }
+  .node.pass .v { fill:var(--accent); } .node.fail .v, .node.err .v { fill:var(--bad); }
+  .card-bg { fill:var(--panel); stroke:var(--line); stroke-width:1; }
+  .card-name { fill:var(--text); font-size:15px; font-weight:var(--w-strong); }
+  .card-at { fill:var(--dim); font-size:12px; font-weight:var(--w); }
+  .card-line { fill:var(--text); font-size:12px; font-weight:var(--w); }
+  .card-av { font-size:16px; font-weight:var(--w-strong); fill:var(--accent); }
+  .card-tag { fill:var(--dim); font-size:11px; font-weight:var(--w-strong); letter-spacing:.04em; }
+  .act-text { font-size:16px; font-weight:var(--w-strong); letter-spacing:0; fill:var(--text); }
+  .act-sub { fill:var(--dim); font-size:11px; font-weight:var(--w); }
+  .node.act.ok .box { stroke:var(--accent); } .node.act.ok .act-text { fill:var(--accent); }
   .node.act.warn .box { stroke:var(--warn); } .node.act.warn .act-text { fill:var(--warn); }
   .node.act.bad .box { stroke:var(--bad); } .node.act.bad .act-text { fill:var(--bad); }
-  .node.act.bad .ringn { opacity:1; filter:url(#neon); }
-  .pop { animation:pop .5s cubic-bezier(.3,1.9,.5,1); transform-box:fill-box; transform-origin:center top; }
-  @keyframes pop { 0% { transform:scale(.7); opacity:.3; } 100% { transform:scale(1); opacity:1; } }
-  .ripple { fill:none; stroke-width:1.5; transform-box:fill-box; transform-origin:center; animation:ripple 1s ease-out forwards; }
-  @keyframes ripple { from { transform:scale(.15) rotate(0deg); opacity:1; } to { transform:scale(1) rotate(45deg); opacity:0; } }
+  .pop { animation:pop .25s ease-out; }
+  @keyframes pop { from { opacity:.4; } to { opacity:1; } }
+  .ripple { fill:none; stroke-width:1.25; transform-box:fill-box; transform-origin:center; animation:ripple .8s ease-out forwards; }
+  @keyframes ripple { from { transform:scale(.4); opacity:.7; } to { transform:scale(1); opacity:0; } }
 
-  /* mascot: original desk capsule "Pip" — bright white/mint pill plush vibe (not official pump.fun IP) */
+  /* Pip: white/mint capsule plush. Flat fills, no halo spam. Not Pump IP. */
   .m-shadow { fill:url(#mShadow); }
-  .m-ring { fill:none; stroke:#4dffc4; stroke-width:1.4; opacity:.55; filter:url(#neon); }
-  .m-halo { fill:url(#mHalo); }
-  .m-body { filter:url(#mGlow); }
-  .m-cap-bot { fill:url(#mCapBot); stroke:#0fa577; stroke-width:1.8; }
-  .m-cap-top { fill:url(#mCapTop); stroke:#d4efe7; stroke-width:1.6; }
+  .m-ring { fill:none; stroke:var(--accent); stroke-width:1; opacity:.2; }
+  .m-halo { fill:url(#mHalo); opacity:.22; }
+  .m-body { filter:none; }
+  .m-cap-bot { fill:#86efac; stroke:#6fde9c; stroke-width:1.25; }
+  .m-cap-top { fill:#f7faf8; stroke:#dfe8e3; stroke-width:1.25; }
   .m-rim { fill:url(#mRim); }
-  .m-bot-hi { fill:url(#mBotHi); }
-  .m-seam { stroke:#d9fff1; stroke-width:1.6; opacity:.95; }
-  .m-seam2 { stroke:#0b9e70; stroke-width:1; opacity:.35; }
-  .m-shine { fill:#fff; opacity:.95; }
-  .m-shine2 { fill:#fff; opacity:.55; }
-  .m-limb { fill:url(#mLimb); stroke:#0d9e72; stroke-width:1.5; }
-  .m-limb.back { fill:url(#mLimbBack); stroke:#0a8a63; }
-  .m-limb-hi { fill:#fff; opacity:.55; }
-  .m-eye { fill:url(#mEye); }
+  .m-bot-hi { fill:#ffffff; opacity:.18; }
+  .m-seam { stroke:#f4faf7; stroke-width:1.25; opacity:.9; }
+  .m-seam2 { stroke:#5dca8e; stroke-width:1; opacity:.45; }
+  .m-shine { fill:#fff; opacity:.7; }
+  .m-shine2 { fill:#fff; opacity:.28; }
+  .m-limb { fill:#86efac; stroke:#6fde9c; stroke-width:1.25; }
+  .m-limb.back { fill:#74e0a0; stroke:#62c98c; }
+  .m-limb-hi { fill:#fff; opacity:.4; }
+  .m-eye { fill:#14181a; }
   .m-glint { fill:#fff; }
-  .m-blush { fill:url(#mBlush); }
-  .m-smile { fill:none; stroke:#14121c; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
-  .m-mouth-open { fill:#3a0f22; stroke:#14121c; stroke-width:1.2; stroke-linejoin:round; }
-  .m-tongue { fill:#ff7aa8; }
-  .m-spark { fill:#eafff7; filter:url(#neon); }
+  .m-blush { fill:#e7b3c2; opacity:.45; }
+  .m-smile { fill:none; stroke:#14181a; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .m-mouth-open { fill:#3a2228; stroke:#14181a; stroke-width:1; stroke-linejoin:round; }
+  .m-tongue { fill:#e7b3c2; }
+  .m-spark { display:none; }
 
-    /* caption bubble */
-  #bubble { position:absolute; z-index:4; left:0; top:0; max-width:330px; padding:8px 12px; border-radius:2px;
-            background:rgba(1,10,16,.92); color:#dff8ff; border:1px solid var(--cyan);
-            font:600 12.5px/1.4 ui-monospace,Menlo,monospace; box-shadow:0 0 14px rgba(0,240,255,.35), inset 0 0 12px rgba(0,240,255,.08);
-            text-shadow:0 0 6px rgba(0,240,255,.45); opacity:0; transition:opacity .2s; pointer-events:none; white-space:normal; }
+  #bubble { position:absolute; z-index:4; left:0; top:0; max-width:320px; padding:8px 10px; border-radius:var(--radius);
+            background:var(--panel); color:var(--text); border:1px solid var(--line);
+            font:var(--w) 13px/1.4 system-ui,"Segoe UI",sans-serif; opacity:0; transition:opacity .2s; pointer-events:none; }
   #bubble.show { opacity:1; }
-  #bubble .who { display:block; font:700 10px ui-monospace,Menlo,monospace; color:var(--mag); letter-spacing:1.5px; margin-bottom:2px; text-transform:uppercase; text-shadow:0 0 6px var(--mag); }
-  #bubble .txt::after { content:"▌"; color:var(--cyan); animation:caret .8s steps(1) infinite; margin-left:1px; }
+  #bubble .who { display:block; font-size:11px; font-weight:var(--w-strong); color:var(--dim); letter-spacing:.03em; margin-bottom:2px; }
+  #bubble .txt::after { content:"▌"; color:var(--accent); animation:caret .8s steps(1) infinite; margin-left:1px; }
   @keyframes caret { 50% { opacity:0; } }
-  #bubble.pass { border-color:var(--ok); box-shadow:0 0 14px rgba(43,255,176,.4); color:#c9ffe9; }
-  #bubble.fail { border-color:var(--bad); box-shadow:0 0 16px rgba(255,43,78,.5); color:#ffd5dc; text-shadow:0 0 6px rgba(255,43,78,.5); }
-  .typing i { display:inline-block; width:6px; height:6px; margin:0 3px; background:var(--cyan); opacity:.3; animation:typ .9s infinite; box-shadow:0 0 6px var(--cyan); }
+  #bubble.pass { border-color:var(--accent); }
+  #bubble.fail { border-color:var(--bad); }
+  .typing i { display:inline-block; width:5px; height:5px; margin:0 2px; background:var(--accent); opacity:.35; border-radius:var(--radius); animation:typ .9s infinite; }
   .typing i:nth-child(2) { animation-delay:.15s; } .typing i:nth-child(3) { animation-delay:.3s; }
   @keyframes typ { 30% { opacity:1; } }
 
-  /* ---------------------------------------------------------------- panels */
   main { padding:16px 22px 28px; display:grid; gap:14px; grid-template-columns:repeat(12, 1fr); }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:14px 16px; min-width:0; position:relative;
-          box-shadow:inset 0 0 0 1px rgba(0,240,255,.03); }
-  .card::before { content:""; position:absolute; top:-1px; left:-1px; width:10px; height:10px; border-top:1px solid var(--cyan); border-left:1px solid var(--cyan); }
-  .card::after { content:""; position:absolute; bottom:-1px; right:-1px; width:6px; height:6px; background:var(--mag); border-radius:50%; transform:translate(50%,50%); box-shadow:0 0 6px var(--mag); }
-  .card h2 { margin:0 0 10px; font-size:11px; color:var(--cyan); text-transform:uppercase; letter-spacing:1.6px; text-shadow:0 0 6px rgba(0,240,255,.5); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; min-width:0; }
+  .card h2 { margin:0 0 12px; font-size:12px; font-weight:var(--w-strong); color:var(--dim); letter-spacing:.04em; text-transform:uppercase; }
   .c4 { grid-column:span 4; } .c12 { grid-column:span 12; }
   @media (max-width:1000px) { .c4 { grid-column:span 12; } }
   .kv { display:grid; grid-template-columns:100px 1fr; gap:6px 10px; }
   .kv div:nth-child(odd) { color:var(--dim); }
-  .mono { font-family:ui-monospace,Menlo,monospace; word-break:break-all; }
-  .big { font-size:19px; font-weight:800; }
-  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); } .dim { color:var(--dim); }
-  table { width:100%; border-collapse:collapse; font-size:12.5px; }
-  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
-  th { color:var(--cyan); font-weight:600; opacity:.75; }
+  .mono { font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace; font-weight:var(--w); font-size:13px; word-break:break-all; }
+  .big { font-size:18px; font-weight:var(--w-strong); }
+  .ok { color:var(--accent); } .bad { color:var(--bad); } .warn { color:var(--warn); } .dim { color:var(--dim); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th { color:var(--dim); font-weight:var(--w-strong); }
   td.wrap { white-space:normal; }
-  .gate { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line); font-size:12.5px; }
-  /* pump.fun mint links (open coin page in new tab; view-only, no trading) */
-  a.mint-link { color:var(--cyan); text-decoration:underline; text-decoration-color:rgba(0,240,255,.6); text-underline-offset:3px; cursor:pointer;
-                text-shadow:0 0 6px rgba(0,240,255,.35); transition:color .15s, text-shadow .15s; }
-  a.mint-link:hover, a.mint-link:focus-visible { color:#fff; text-decoration-color:var(--mag); text-shadow:0 0 8px var(--mag); outline:none; }
-  a.mint-link .ext { font-size:.85em; margin-left:3px; color:var(--mag); text-decoration:none; display:inline-block; }
-  .hud a.mint-link { pointer-events:auto; text-transform:none; }
-  #mascot, #fx, #trail, #gstrands, #mesh { pointer-events:none; }  /* crawler never blocks the coin-card link */
+  #gates { display:flex; flex-direction:column; gap:8px; }
+  .gate { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px;
+          border:1px solid var(--line); border-radius:var(--radius); background:transparent; }
+  .gate-name { color:var(--text); font-weight:var(--w); }
+  .gate-mark { font-weight:var(--w-strong); font-size:12px; letter-spacing:.04em; padding:3px 8px; border-radius:var(--radius); border:1px solid var(--line); }
+  .gate.pass .gate-mark { color:var(--ink); background:var(--accent); border-color:var(--accent); }
+  .gate.fail .gate-mark { color:#F6E7E4; background:#8C3D38; border-color:#8C3D38; }
+  a.mint-link { color:var(--accent); text-underline-offset:3px; }
+  a.mint-link:hover, a.mint-link:focus-visible { color:var(--text); }
+  a.mint-link .ext { font-size:.85em; margin-left:3px; color:var(--dim); text-decoration:none; }
+  .hud a.mint-link { pointer-events:auto; }
+  #mascot, #fx, #trail, #gstrands, #mesh { pointer-events:none; }
   #web a.svg-mint { cursor:pointer; }
-  #web a.svg-mint .card-mint { fill:var(--cyan); font:700 11px ui-monospace,Menlo,monospace; text-decoration:underline; }
-  #web a.svg-mint:hover .card-mint, #web a.svg-mint:focus .card-mint { fill:#fff; }
-  #web a.svg-mint:hover .card-bg { stroke:var(--mag); }
-
-  a.hdr-link { color:var(--cyan); text-decoration:none; font:800 11px ui-monospace,Menlo,monospace; letter-spacing:1px; text-transform:uppercase;
-               padding:7px 12px; border:1px solid rgba(0,240,255,.45); border-radius:2px;
-               box-shadow:0 0 8px rgba(0,240,255,.2); transition:all .15s; }
-  a.hdr-link:hover { color:#fff; border-color:var(--mag); box-shadow:0 0 14px rgba(255,43,214,.4); background:rgba(255,43,214,.08); }
-  a.hdr-link.donate { color:#4dffc4; border-color:rgba(77,255,196,.55); box-shadow:0 0 8px rgba(77,255,196,.25); }
-  a.hdr-link.donate:hover { color:#fff; border-color:#4dffc4; background:rgba(77,255,196,.12); }
-  @media (prefers-reduced-motion: reduce) { #trail, .gstrand.pass, .mnode.blip, .node.fail .ringn { animation:none; } }
+  #web a.svg-mint .card-mint { fill:var(--accent); font-size:11px; font-weight:var(--w-strong); text-decoration:underline; }
+  #web a.svg-mint:hover .card-mint, #web a.svg-mint:focus .card-mint { fill:var(--text); }
+  #web a.svg-mint:hover .card-bg { stroke:var(--accent); }
+  a.hdr-link { color:var(--text); text-decoration:none; font-weight:var(--w-strong); font-size:13px;
+               padding:6px 10px; border:1px solid var(--line); border-radius:var(--radius); }
+  a.hdr-link:hover { color:var(--accent); border-color:var(--accent); }
+  @media (prefers-reduced-motion: reduce) { .pop, .ripple, #bubble .txt::after, .typing i { animation:none; } }
 </style>
 </head>
 <body>
 <header>
   <svg class="logo" viewBox="0 0 30 30" aria-hidden="true">
-    <defs>
-      <linearGradient id="logoTop" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f2fdf8"/></linearGradient>
-      <linearGradient id="logoBot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fffd8"/><stop offset=".5" stop-color="#3fe9b2"/><stop offset="1" stop-color="#16bd88"/></linearGradient>
-      <filter id="logoGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.1" result="b"/><feFlood flood-color="#4dffc4" flood-opacity=".7"/><feComposite in2="b" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    </defs>
-    <g filter="url(#logoGlow)">
-    <!-- capsule: top crisp white / bottom bright mint -->
-    <path d="M8,15 L8,9.5 A7,7 0 0 1 22,9.5 L22,15 Z" fill="url(#logoTop)" stroke="#d4efe7" stroke-width=".7"/>
-    <path d="M8,15 L8,20.5 A7,7 0 0 0 22,20.5 L22,15 Z" fill="url(#logoBot)" stroke="#0fa577" stroke-width=".7"/>
+    <g>
+    <path d="M8,15 L8,9.5 A7,7 0 0 1 22,9.5 L22,15 Z" fill="#f7faf8" stroke="#dfe8e3" stroke-width=".7"/>
+    <path d="M8,15 L8,20.5 A7,7 0 0 0 22,20.5 L22,15 Z" fill="#86efac" stroke="#6fde9c" stroke-width=".7"/>
     </g>
     <line x1="8.5" y1="15" x2="21.5" y2="15" stroke="#d9fff1" stroke-width=".6"/>
     <ellipse cx="11" cy="6.6" rx="2.2" ry="1.2" fill="#fff" transform="rotate(-25 11 6.6)"/>
@@ -209,33 +191,25 @@
     <ellipse cx="12.2" cy="27" rx="2" ry="1.6" fill="#4ff0bb" stroke="#0fa577" stroke-width=".6"/>
     <ellipse cx="17.8" cy="27" rx="2" ry="1.6" fill="#4ff0bb" stroke="#0fa577" stroke-width=".6"/>
   </svg>
-  <h1>Capsule</h1>
-  <span class="sub">$CAPS · pump desk</span>
-  <span class="badge b-warn">dry-run</span>
-  <span id="live-badge" class="badge b-ok">live_order: false</span>
+  <div class="brand">
+    <h1>Capsule</h1>
+    <p class="sub">$CAPS · paper desk</p>
+  </div>
+  <p class="mode-badge" role="status">DRY RUN · PAPER</p>
+  <p class="affil">Not affiliated with Pump · <a href="https://x.com/0xPliny" target="_blank" rel="noopener noreferrer">tips</a></p>
   <span class="spacer"></span>
-  <a class="hdr-link donate" href="https://x.com/0xPliny" target="_blank" rel="noopener noreferrer" title="Tip / support via X">Donate</a>
+  <span id="live-badge" class="status-pill">orders off</span>
+  <a class="hdr-link" href="https://x.com/0xPliny" target="_blank" rel="noopener noreferrer" title="Tips on X">Tips</a>
   <a class="hdr-link" href="https://github.com/0xPliny/Capsule" target="_blank" rel="noopener noreferrer">GitHub</a>
   <a class="hdr-link" href="https://x.com/0xPliny" target="_blank" rel="noopener noreferrer">X</a>
   <span id="status"></span>
-  <button id="run">Run dry-run</button>
+  <button id="run" type="button">Run dry-run</button>
 </header>
 
 <section id="stage" aria-label="Capsule mascot touring the latest dry-run decision graph">
   <canvas id="dust"></canvas>
   <svg id="web" viewBox="0 0 1200 540" preserveAspectRatio="xMidYMid meet">
     <defs>
-      <filter id="neon" x="-50%" y="-50%" width="200%" height="200%">
-        <feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="neonMag" x="-200%" y="-200%" width="500%" height="500%">
-        <feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="mGlow" x="-70%" y="-50%" width="240%" height="200%">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="4.5" result="b"/><feFlood flood-color="#4dffc4" flood-opacity=".6"/><feComposite in2="b" operator="in" result="g"/>
-        <feGaussianBlur in="SourceAlpha" stdDeviation="1.4" result="b2"/><feFlood flood-color="#ffffff" flood-opacity=".35"/><feComposite in2="b2" operator="in" result="w"/>
-        <feMerge><feMergeNode in="g"/><feMergeNode in="w"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
       <linearGradient id="mCapTop" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#ffffff"/><stop offset="1" stop-color="#eefcf6"/>
       </linearGradient>
@@ -276,10 +250,10 @@
     <g id="fx"></g>
     <g id="mascot"></g>
   </svg>
-  <div class="hud tl"><div class="title">capsule<b>::</b>pump desk</div><div id="hud-coin" style="margin-top:5px">mapping …</div></div>
+  <div class="hud tl"><div class="title">Paper desk</div><div id="hud-coin">mapping …</div></div>
   <div class="hud tr"><div id="hud-step">step – / –</div><div id="prog"><i></i></div></div>
-  <div class="hud bl"><span class="dot" style="background:var(--mag);margin-left:0;box-shadow:0 0 6px var(--mag)"></span>node<span class="dash" style="background:var(--cyan);box-shadow:0 0 6px var(--cyan)"></span>edge<span class="dash" style="background:var(--ok)"></span>gate holds<span class="dash" style="background:var(--bad)"></span>gate snaps<span class="dash" style="background:var(--mag)"></span>crawl path</div>
-  <div class="hud br">dry-run · no orders · live_order <span id="hud-live">false</span></div>
+  <div class="hud bl"><span class="key"><i class="swatch node"></i>node</span><span class="key"><i class="swatch edge"></i>edge</span><span class="key"><i class="swatch pass"></i>gate holds</span><span class="key"><i class="swatch fail"></i>gate snaps</span><span class="key"><i class="swatch path"></i>path</span></div>
+  <div class="hud br"><div class="paper-note">DRY RUN · PAPER</div><div>no orders · live_order <span id="hud-live">false</span></div></div>
   <div id="bubble" aria-live="polite"></div>
 </section>
 
@@ -344,8 +318,8 @@ function renderPanels(row) {
   if (!row) { $("#coin").innerHTML = "<div>status</div><div>No decisions logged yet. Click Run dry-run.</div>"; return; }
   const s = row.snapshot || {}, c = s.coin || {}, j = row.judgment || {}, d = rowIntent(row);
   const live = !!row.live_order;
-  const lb = $("#live-badge"); lb.textContent = "live_order: " + live; lb.className = "badge " + (live ? "b-bad" : "b-ok");
-  $("#hud-live").textContent = String(live); $("#hud-live").style.color = live ? "var(--bad)" : "var(--ok)";
+  const lb = $("#live-badge"); lb.textContent = live ? "live_order true" : "orders off"; lb.className = "status-pill" + (live ? " is-bad" : "");
+  $("#hud-live").textContent = String(live); $("#hud-live").style.color = live ? "var(--bad)" : "var(--dim)";
   $("#coin").innerHTML = `
     <div>coin</div><div class="big">${(c.mint || s.mint) ? mintLink(c.mint || s.mint, c.name || s.symbol) : esc(c.name || s.symbol)} <span class="dim" style="font-size:13px">${esc(s.symbol)}</span></div>
     <div>mint</div><div class="mono">${mintLink(c.mint || s.mint)}</div>
@@ -354,7 +328,7 @@ function renderPanels(row) {
     <div>venue</div><div>${esc(s.venue)}${c.curve_progress!=null ? ` · curve ${(c.curve_progress*100).toFixed(1)}%` : ""}</div>
     <div>elapsed_ms</div><div class="mono">${esc(row.elapsed_ms)} <span class="dim">(fetch ${esc(row.fetch_ms)} · judgment ${esc(row.judgment_ms ?? row.jev_ms)})</span></div>
     <div>logged</div><div>${esc(tlocal(row.ts))}</div>
-    <div>live_order</div><div><span class="badge ${live ? "b-bad" : "b-ok"}">${live}</span></div>
+    <div>orders</div><div><span class="status-pill${live ? " is-bad" : ""}">${live ? "live_order true" : "off · paper"}</span></div>
     ${s.fetch_error ? `<div>fetch error</div><div class="bad">${esc(s.fetch_error)}</div>` : ""}`;
   if (j.error) {
     $("#jev").innerHTML = `<div class="bad">${esc(j.error)}</div>`;
@@ -369,7 +343,7 @@ function renderPanels(row) {
   }
   const g = gateMap(row.gates) || gateMap(d.gates) || {};
   $("#gates").innerHTML = Object.keys(g).length ? Object.entries(g).map(([k,v]) =>
-    `<div class="gate"><span>${esc(GATE_LABELS[k] || k)}</span><span class="${v?"ok":"bad"}">${v ? "PASS" : "FAIL"}</span></div>`).join("")
+    `<div class="gate ${v ? "pass" : "fail"}"><span class="gate-name">${esc(GATE_LABELS[k] || k)}</span><span class="gate-mark">${v ? "PASS" : "FAIL"}</span></div>`).join("")
     : `<div class="dim">no gates evaluated</div>`;
   $("#action").innerHTML = `<div class="big ${actionClass(d.action)}">${esc(d.action)}</div>
     <div class="dim">${esc(d.reason)}</div><div class="dim mono">risk_usd ${esc(d.risk_usd)}</div>`;
@@ -384,14 +358,14 @@ function renderLogs(rows) {
     <td class="${actionClass(r.action)}">${esc(r.action)}</td>
     <td class="wrap dim">${esc(r.error || r.reason)}</td>
     <td class="mono">${esc(r.elapsed_ms)}</td>
-    <td><span class="badge ${r.live_order ? "b-bad" : "b-ok"}">${r.live_order}</span></td></tr>`).join("")
+    <td><span class="status-pill${r.live_order ? " is-bad" : ""}">${r.live_order ? "true" : "false"}</span></td></tr>`).join("")
     || `<tr><td colspan="10" class="dim">no rows yet</td></tr>`;
 }
 
 // ------------------------------------------------------------- graph geometry
 const W = 1200, H = 540;
 function el(tag, attrs, parent) { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; }
-// tour stop anchor points (magenta nodes); labels hang off them in cyan boxes
+// tour stop anchor points; labels hang off them in panel boxes
 const POS = {
   coin: {x:296, y:222},
   q0: {x:372, y:86},  q1: {x:548, y:56},  q2: {x:470, y:196},
@@ -518,50 +492,16 @@ function renderMascot(now) {
   let mouth = 0 /* 0 smile · 1 grin · 2 "o" */, spark = 0, blushK = 1;
   const R = M.react, ru = R ? (now - R.t0) / R.dur : 9;
   if (R && ru >= 1) M.react = null;
+  // Calm rest: the tour still walks the graph. The body only breathes, and flinches once on a failed gate.
   if (!REDUCED) {
-    if (SP.walking) {
-      const t = now / 330, ph = t % 1, g = Math.sin(Math.PI * ph);        // one hop every 330 ms
-      const contact = Math.pow(1 - g, 5);                                 // ≈1 at take-off / landing
-      hopY = -g * 24; ground = 1 - g;
-      sy = 1 + 0.2 * g - 0.22 * contact; sx = 1 - 0.12 * g + 0.2 * contact;  // squash on contact, stretch mid-air
-      const sw = Math.sin(Math.PI * t);                                    // alternates every hop
-      legF = sw * 30; legB = -sw * 30;
-      armF = -sw * 42 - 18 * g; armB = sw * 42 - 18 * g;
-      lean = 9 + 3 * Math.sin(2 * Math.PI * t); tilt = 3 * sw;
-      mouth = g > 0.55 ? 1 : 0;
-      M.nextHop = now + 1000 + Math.random() * 1400; M.nextWave = Math.max(M.nextWave, now + 2500);
-    } else {
-      if (M.wasWalking) M.landT0 = now;
-      const br = Math.sin(now / 460);
-      sy = 1 + 0.04 * br; sx = 1 - 0.028 * br; hopY = -1.6 - 1.6 * br;   // breathing bob
-      lean = 4.5 * Math.sin(now / 620);                                   // idle wiggle
-      tilt = 5 * Math.sin(now / 1150 + 0.6) + M.look * 5;                 // head tilt follows glances
-      armF = 10 * Math.sin(now / 560) + 4; armB = 10 * Math.sin(now / 560 + 1.4) + 4;
-      legF = 5 * Math.sin(now / 620); legB = -legF;
-      const lu = (now - M.landT0) / 450;                                  // arrival: squash + jelly wobble
-      if (lu >= 0 && lu < 1) { const w = Math.sin(lu * Math.PI * 3) * (1 - lu); sy -= 0.2 * w; sx += 0.16 * w; }
-      if (now > M.nextHop) { M.hopT0 = now; M.nextHop = now + 2000 + Math.random() * 2600; }
-      const u = (now - M.hopT0) / 620, hopping = u >= 0 && u < 1;          // idle hop: anticipate → jump → land
-      if (hopping) {
-        if (u < 0.2) { const q = Math.sin(Math.PI * u / 0.2); sy -= 0.2 * q; sx += 0.15 * q; armF += 18 * q; armB += 18 * q; }
-        else if (u < 0.8) { const q = (u - 0.2) / 0.6, g = Math.sin(Math.PI * q); hopY -= g * 32; ground = 1 - g; sy += 0.18 * g; sx -= 0.11 * g;
-          legF = -22 * g; legB = 22 * g; armF = -70 * g; armB = -70 * g; mouth = 1; }
-        else { const q = Math.sin(Math.PI * (u - 0.8) / 0.2); sy -= 0.18 * q; sx += 0.14 * q; }
-      }
-      if (now > M.nextWave && !hopping) { M.waveT0 = now; M.nextWave = now + 5200 + Math.random() * 4000; }
-      const wu = (now - M.waveT0) / 1300;                                 // friendly wave with the front arm
-      if (wu >= 0 && wu < 1) { const env = Math.sin(Math.PI * wu); armF = armF * (1 - env) + (-115 + 24 * Math.sin(now / 85)) * env; tilt += 4 * env; mouth = 1; }
+    const br = Math.sin(now / 1100);
+    sy = 1 + 0.012 * br; sx = 1 - 0.008 * br; hopY = -0.4 * br;
+    if (SP.walking) lean = 2;
+    if (R && ru < 1) {
+      if (R.kind === "pass") mouth = 1;
+      else { shakeX = Math.sin(ru * Math.PI * 6) * 1.4 * (1 - ru); mouth = 2; }
     }
-    if (R) {
-      const env = Math.sin(Math.PI * Math.min(1, ru));
-      if (R.kind === "pass") {                                            // happy double-hop, arms up, sparkle burst
-        const g = Math.abs(Math.sin(2 * Math.PI * ru)); if (!SP.walking) { hopY -= g * 22; ground = Math.min(ground, 1 - g); }
-        armF = -120 * env; armB = -120 * env; sy += 0.12 * g; sx -= 0.08 * g; mouth = 1; spark = env; blushK = 1 + 0.5 * env;
-      } else {                                                            // shiver + "o" mouth
-        shakeX = Math.sin(ru * Math.PI * 9) * 4.5 * (1 - ru); tilt += shakeX * 1.5; mouth = 2; armF = 25 * env; armB = 25 * env;
-      }
-    }
-  } else if (R) { mouth = R.kind === "fail" ? 2 : 1; spark = R.kind === "pass" ? 0.7 : 0; }
+  } else if (R) { mouth = R.kind === "fail" ? 2 : 1; }
   M.wasWalking = SP.walking;
   // eyes: blink (sometimes a double blink) + occasional glance (scanning)
   if (now > M.nextBlink) { M.blinkT0 = now; M.dbl = Math.random() < 0.25; M.nextBlink = now + 2000 + Math.random() * 2600; }
@@ -570,16 +510,16 @@ function renderMascot(now) {
   if (!REDUCED && now > M.nextLook) { M.lookT = SP.walking ? 0 : (Math.random() < 0.5 ? -1 : 1) * Math.random(); M.nextLook = now + 1200 + Math.random() * 2400; }
   M.look += (M.lookT - M.look) * Math.min(1, dt * 0.01);
 
-  MG.root.setAttribute("transform", `translate(${SP.x.toFixed(1)},${SP.y.toFixed(1)})`);
+  MG.root.setAttribute("transform", `translate(${SP.x.toFixed(1)},${SP.y.toFixed(1)}) scale(0.62)`);
   MG.flip.setAttribute("transform", `scale(${M.face.toFixed(3)},1)`);
   MG.hop.setAttribute("transform", `translate(0,${hopY.toFixed(2)})`);
   MG.lean.setAttribute("transform", `translate(${shakeX.toFixed(2)},0) rotate(${(lean + tilt * 0.6).toFixed(2)})`);
   MG.sq.setAttribute("transform", `translate(0,-2) scale(${sx.toFixed(3)},${sy.toFixed(3)}) translate(0,2)`);
   MG.face.setAttribute("transform", `translate(${(M.look * 1.6).toFixed(2)},0) rotate(${(tilt * 0.5).toFixed(2)} 0 -55)`);
   const ss = (0.55 + 0.45 * ground).toFixed(3);
-  MG.shadow.setAttribute("transform", `scale(${ss},${ss})`); MG.shadow.style.opacity = (0.3 + 0.7 * ground).toFixed(2);
-  MG.ring.style.opacity = (REDUCED ? 0.5 : (SP.walking ? 0.25 : 0.4 + 0.25 * Math.sin(now / 520))).toFixed(2);
-  MG.halo.style.opacity = Math.min(1, (REDUCED ? 0.8 : 0.7 + 0.22 * Math.sin(now / 700)) + spark * 0.4).toFixed(2);
+  MG.shadow.setAttribute("transform", `scale(${ss},${ss})`); MG.shadow.style.opacity = "0.35";
+  MG.ring.style.opacity = "0.18";
+  MG.halo.style.opacity = "0.16";
   MG.legF.setAttribute("transform", `rotate(${legF.toFixed(1)} 10 -3)`);
   MG.legB.setAttribute("transform", `rotate(${legB.toFixed(1)} -10 -3)`);
   MG.armF.setAttribute("transform", `rotate(${armF.toFixed(1)} 20 -42)`);
@@ -608,17 +548,17 @@ function positionBubble() {
   const st = $("#stage").getBoundingClientRect(), k = m.a;
   const sx = m.a * SP.x + m.e - st.left, sy = m.d * SP.y + m.f - st.top;
   const bw = bubble.offsetWidth, bh = bubble.offsetHeight;
-  let left = sx + 52 * k, top = sy - bh - 100 * k;         // up-right of the capsule head, like a speech bubble
+  let left = sx + 28 * k, top = sy - bh - 62 * k;
   if (left + bw > st.width - 10) left = sx - 52 * k - bw;
   if (top < 40) top = sy + 30 * k;
   left = Math.max(10, Math.min(st.width - bw - 10, left)); top = Math.max(36, Math.min(st.height - bh - 30, top));
   bubble.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px)`;
 }
-function sayTyping() { bubbleType++; bubble.className = "show"; bubble.innerHTML = `<span class="who">capsule · $caps</span><span class="typing"><i></i><i></i><i></i></span>`; }
+function sayTyping() { bubbleType++; bubble.className = "show"; bubble.innerHTML = `<span class="who">Capsule · paper</span><span class="typing"><i></i><i></i><i></i></span>`; }
 async function say(text, mood, token) {
   const my = ++bubbleType;
   bubble.className = "show" + (mood ? " " + mood : "");
-  bubble.innerHTML = `<span class="who">capsule · $caps${mood === "fail" ? " · alert" : ""}</span><span class="txt"></span>`;
+  bubble.innerHTML = `<span class="who">Capsule · paper${mood === "fail" ? " · gate" : ""}</span><span class="txt"></span>`;
   const t = bubble.querySelector(".txt");
   if (REDUCED) { t.textContent = text; return; }
   for (let i = 1; i <= text.length; i++) {
@@ -632,7 +572,7 @@ let NODES = {}, STOPS = [], GSTR = {};
 function pillNode(id, key, val, extraCls) {
   const p = POS[id], g = el("g", {class:"node " + (extraCls || ""), id:"n-" + id, transform:`translate(${p.x},${p.y})`}, $("#nodes"));
   el("line", {x1:0, y1:0, x2:12, y2:10, class:"lead"}, g);
-  const rect = el("rect", {x:12, y:10, height:38, rx:1.5, class:"box"}, g);
+  const rect = el("rect", {x:12, y:10, height:38, rx:6, class:"box"}, g);
   const k = el("text", {x:22, y:25, class:"k"}, g); k.textContent = key;
   const v = el("text", {x:22, y:41, class:"v"}, g); v.textContent = val;
   el("circle", {r:10, class:"ringn"}, g);
@@ -650,23 +590,23 @@ function buildStage(row) {
   const mint = c.mint || s.mint;
   $("#hud-coin").innerHTML = row ? `mapping $${esc(trunc(sym, 18))}${pumpUrl(mint) ? " · " + mintLink(mint, shortMint(mint)) : ""} · ${esc(tlocal(row.ts))}` : "waiting for a decision…";
 
-  // coin card: a highlighted "post" box with magenta nodes pinned on its corners
+  // coin card: panel box, view-only mint link when a real mint is present
   const cp = POS.coin, hub = el("g", {class:"node", id:"n-coin", transform:`translate(${cp.x},${cp.y})`}, $("#nodes"));
   const cardUrl = row ? pumpUrl(mint) : null;
   const bx = -258, by = 0, bw = 258, bh = cardUrl ? 110 : 92;
   // whole card is a pump.fun link when (and only when) the decision carries a real mint
   const cardBox = cardUrl ? el("a", {class:"svg-mint", href:cardUrl, target:"_blank", rel:"noopener noreferrer", "aria-label":`Open ${mint} on pump.fun`}, hub) : hub;
   if (cardUrl) { cardBox.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", cardUrl); const tt = el("title", {}, cardBox); tt.textContent = `Open ${mint} on pump.fun (new tab)`; }
-  el("rect", {x:bx, y:by, width:bw, height:bh, rx:1.5, class:"card-bg"}, cardBox);
-  const tg = el("text", {x:bx + 10, y:by - 6, class:"card-tag"}, cardBox); tg.textContent = "TARGET · COIN";
-  el("rect", {x:bx + 12, y:by + 14, width:34, height:34, fill:"none", stroke:"#ff2bd6", "stroke-width":1.2}, cardBox);
+  el("rect", {x:bx, y:by, width:bw, height:bh, rx:6, class:"card-bg"}, cardBox);
+  const tg = el("text", {x:bx + 10, y:by - 6, class:"card-tag"}, cardBox); tg.textContent = "Coin";
+  el("rect", {x:bx + 12, y:by + 14, width:34, height:34, rx:6, fill:"none", stroke:"#2C3530", "stroke-width":1}, cardBox);
   const av = el("text", {x:bx + 29, y:by + 37, "text-anchor":"middle", class:"card-av"}, cardBox); av.textContent = (sym[0] || "?").toUpperCase();
   const nm = el("text", {x:bx + 56, y:by + 29, class:"card-name"}, cardBox); nm.textContent = trunc(c.name || sym, 18);
   const at = el("text", {x:bx + 56, y:by + 46, class:"card-at"}, cardBox);
   at.textContent = `$${trunc(s.symbol || "?", 10)}` + (c.curve_progress != null ? ` · curve ${(c.curve_progress * 100).toFixed(0)}%` : "") + (c.age_min != null ? ` · ${Math.round(c.age_min)}m` : "");
   const ln = el("text", {x:bx + 12, y:by + 76, class:"card-line"}, cardBox); ln.textContent = row ? `mid $${px(price)} · mcap ${usdK(c.market_cap_usd)}` : "no decision yet · hit Run";
   if (cardUrl) { const mt = el("text", {x:bx + 12, y:by + 98, class:"card-mint"}, cardBox); mt.textContent = `CA ${shortMint(mint)} ↗ pump.fun`; }
-  [[bx, by], [bx, by + bh], [0, by + bh]].forEach(([x, y]) => el("circle", {cx:x, cy:y, r:3.2, fill:"#ff2bd6"}, hub));
+  [[bx, by], [bx, by + bh], [0, by + bh]].forEach(([x, y]) => el("circle", {cx:x, cy:y, r:3.2, fill:"#8E9791"}, hub));
   el("circle", {r:10, class:"ringn"}, hub); el("circle", {r:5.5, class:"dotn"}, hub);
   NODES.coin = {id:"coin", x:cp.x, y:cp.y, g:hub};
 
@@ -696,7 +636,7 @@ function buildStage(row) {
   const ag = el("g", {class:"node act", id:"n-action", transform:`translate(${ap.x},${ap.y})`}, $("#nodes"));
   el("line", {x1:0, y1:0, x2:0, y2:16, class:"lead"}, ag);
   const inner = el("g", {}, ag);
-  el("rect", {x:-112, y:16, width:224, height:68, rx:1.5, class:"box"}, inner);
+  el("rect", {x:-112, y:16, width:224, height:68, rx:6, class:"box"}, inner);
   const atx = el("text", {x:0, y:45, "text-anchor":"middle", class:"act-text"}, inner); atx.textContent = "…";
   const as1 = el("text", {x:0, y:62, "text-anchor":"middle", class:"act-sub"}, inner); as1.textContent = "verdict pending";
   const as2 = el("text", {x:0, y:76, "text-anchor":"middle", class:"act-sub"}, inner); as2.textContent = `dry-run · live_order ${row ? !!row.live_order : false}`;
@@ -769,16 +709,16 @@ async function tour(row) {
       if (token !== tourToken) return;
       n.g.classList.add("visit");
       if (st.gate) {
-        const res = n.res; n.v.textContent = res == null ? "not run" : res ? "PASS ✓ holds" : "FAIL ✗ snap"; n.fit();
+        const res = n.res; n.v.textContent = res == null ? "—" : res ? "PASS" : "FAIL"; n.fit();
         if (res != null) n.g.classList.add(res ? "pass" : "fail");
         const [h1, h2] = GSTR[st.id];
-        if (res === true) { h1.classList.add("pass"); h2.classList.add("pass"); ripple(n.x, n.y, "#2bffb0"); mascotReact("pass"); }
-        else if (res === false) { h1.classList.add("fail"); h2.classList.add("fail"); ripple(n.x, n.y, "#ff2b4e"); mascotReact("fail");
-          requestAnimationFrame(() => { h1.style.transform = "rotate(26deg) scale(.8)"; h2.style.transform = "rotate(-22deg) scale(.8)"; });
-          setTimeout(() => { if (token === tourToken) { h1.style.opacity = .5; h2.style.opacity = .5; } }, 900); }
-        else ripple(n.x, n.y, "#00f0ff");
-      } else if (st.id === "action") { n.reveal(); const ac = actionClass(rowIntent(row).action); ripple(n.x, n.y, ac === "ok" ? "#2bffb0" : ac === "bad" ? "#ff2b4e" : "#ffc23d"); mascotReact(ac === "bad" ? "fail" : "pass"); }
-      else ripple(n.x, n.y, st.id === "coin" ? "#ff2bd6" : "#00f0ff");
+        if (res === true) { h1.classList.add("pass"); h2.classList.add("pass"); ripple(n.x, n.y, "#86efac"); mascotReact("pass"); }
+        else if (res === false) { h1.classList.add("fail"); h2.classList.add("fail"); ripple(n.x, n.y, "#E08A82"); mascotReact("fail");
+          requestAnimationFrame(() => { h1.style.transform = "rotate(8deg)"; h2.style.transform = "rotate(-8deg)"; });
+          setTimeout(() => { if (token === tourToken) { h1.style.opacity = .55; h2.style.opacity = .55; } }, 900); }
+        else ripple(n.x, n.y, "#8E9791");
+      } else if (st.id === "action") { n.reveal(); const ac = actionClass(rowIntent(row).action); ripple(n.x, n.y, ac === "ok" ? "#86efac" : ac === "bad" ? "#E08A82" : "#C6B48A"); mascotReact(ac === "bad" ? "fail" : "pass"); }
+      else ripple(n.x, n.y, "#86efac");
       await say(st.text, st.mood, token);
       await sleep(st.id === "action" ? 3600 : st.gate ? 1400 : 1100);
     }
@@ -795,14 +735,14 @@ function startDust() {
   const cv = $("#dust"), cx = cv.getContext("2d"); let Wd = 0, Hd = 0;
   const resize = () => { const dpr = devicePixelRatio || 1; Wd = cv.clientWidth; Hd = cv.clientHeight; cv.width = Wd * dpr; cv.height = Hd * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0); };
   resize(); new ResizeObserver(resize).observe(cv);
-  const cols = ["0,240,255", "255,43,214"];
-  const P = Array.from({length: REDUCED ? 0 : 55}, () => ({x: Math.random(), y: Math.random(), s: 1 + Math.random() * 1.5,
-    vx: (Math.random() - .5) * .00008, vy: -.00003 - Math.random() * .00008, c: cols[Math.random() < .7 ? 0 : 1], ph: Math.random() * 6.28}));
+  const cols = ["134,239,172"];
+  const P = Array.from({length: REDUCED ? 0 : 12}, () => ({x: Math.random(), y: Math.random(), s: 1 + Math.random() * 1.2,
+    vx: (Math.random() - .5) * .00004, vy: -.00002 - Math.random() * .00004, c: cols[0], ph: Math.random() * 6.28}));
   (function f(now) {
     cx.clearRect(0, 0, Wd, Hd);
     for (const p of P) {
       p.x += p.vx * 16; p.y += p.vy * 16; if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); } if (p.x < 0) p.x = 1; if (p.x > 1) p.x = 0;
-      cx.fillStyle = `rgba(${p.c},${(.15 + .4 * (0.5 + 0.5 * Math.sin(now / 600 + p.ph))).toFixed(2)})`;
+      cx.fillStyle = `rgba(${p.c},${(.04 + .06 * (0.5 + 0.5 * Math.sin(now / 900 + p.ph))).toFixed(2)})`;
       cx.fillRect(p.x * Wd, p.y * Hd, p.s, p.s);
     }
     requestAnimationFrame(f);
