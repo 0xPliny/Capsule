@@ -108,8 +108,9 @@
               pointer-events:auto; cursor:pointer; touch-action:manipulation; }
   #desk-pet[data-reacting="1"] { cursor:default; }
   #desk-pet:focus-visible { outline:none; }
-  #desk-pet:focus-visible #pet-svg { outline:1px solid var(--accent); outline-offset:4px; }
-  #pet-svg { position:absolute; left:-70px; top:-70px; overflow:visible; display:block; pointer-events:auto; cursor:inherit; }
+  #desk-pet:focus-visible #spider-body { outline:1px solid var(--accent); outline-offset:3px; }
+  #pet-svg { position:absolute; left:-70px; top:-70px; overflow:visible; display:block; pointer-events:none; cursor:inherit; }
+  #spider-body, #pet-legs { pointer-events:visiblePainted; cursor:inherit; }
   #pet-legs .leg-edge { fill:none; stroke:#1F4D3D; stroke-width:4.6; stroke-linecap:round; stroke-linejoin:round; }
   #pet-legs .leg-line { fill:none; stroke:#4FCB86; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round;
                         filter:drop-shadow(0 0 8px rgba(79,203,134,.55)); }
@@ -785,10 +786,19 @@ function holderPaused() {
 function roamBounds() {
   const header = document.querySelector("header").getBoundingClientRect();
   const inset = 12, half = 64;
-  const minY = Math.max(header.bottom + 8, inset) + half;
-  const maxY = Math.max(minY + 48, innerHeight - inset - half);
-  const minX = inset + half;
-  const maxX = Math.max(minX + 48, innerWidth - inset - half);
+  let minY = Math.max(header.bottom + 8, inset) + half;
+  let maxY = Math.max(minY + 48, innerHeight - inset - half);
+  let minX = inset + half;
+  let maxX = Math.max(minX + 48, innerWidth - inset - half);
+  const lane = hudLane();
+  if (lane) {
+    minX = Math.max(minX, lane.minX);
+    maxX = Math.min(maxX, lane.maxX);
+    minY = Math.max(minY, lane.minY);
+    maxY = Math.min(maxY, lane.maxY);
+    if (maxX < minX + 8) maxX = minX + 8;
+    if (maxY < minY + 8) maxY = minY + 8;
+  }
   return { minX, maxX, minY, maxY };
 }
 function avoidRects() {
@@ -817,6 +827,49 @@ function hitsAvoid(x, y, pad) {
     if (s.r > a.l && s.l < a.r && s.b > a.t && s.t < a.b) return true;
   }
   return false;
+}
+function hudRects() {
+  return [...document.querySelectorAll("#stage .hud")].map((el) => {
+    const r = el.getBoundingClientRect();
+    return {l: r.left - 4, t: r.top - 4, r: r.right + 4, b: r.bottom + 4, w: r.width};
+  }).filter((a) => a.w > 2);
+}
+function boxHits(x, y, rects, half) {
+  const s = {l: x - half, t: y - half, r: x + half, b: y + half};
+  return rects.some((a) => s.r > a.l && s.l < a.r && s.b > a.t && s.t < a.b);
+}
+// Phone stage legend is full width, so a straight roam between stops cuts it.
+// Keep the whole segment out of .hud, not just the endpoints.
+function segmentHitsHud(a, b) {
+  if (!a || !b || innerWidth > 520) return false;
+  const rects = hudRects();
+  if (!rects.length) return false;
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  const steps = Math.max(1, Math.ceil(dist / 8));
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    if (boxHits(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, rects, 74)) return true;
+  }
+  return false;
+}
+function hudLane() {
+  if (innerWidth > 520) return null;
+  const stage = $("#stage").getBoundingClientRect();
+  if (stage.width < 40 || stage.height < 40) return null;
+  const reach = 76;
+  let minY = stage.top + 8;
+  let maxY = stage.bottom - 8;
+  for (const h of hudRects()) {
+    const mid = (h.t + h.b) / 2;
+    if (mid < stage.top + stage.height * 0.5) minY = Math.max(minY, h.b + reach);
+    else if (h.w > stage.width * 0.65) maxY = Math.min(maxY, h.t - reach);
+  }
+  if (maxY - minY < 8) {
+    // No gap between the top HUD and the full-width legend. Roam under the stage.
+    const floor = stage.bottom + reach;
+    return {minX: reach, maxX: innerWidth - reach, minY: floor, maxY: Math.max(floor + 36, innerHeight - reach)};
+  }
+  return {minX: stage.left + 8, maxX: stage.right - 8, minY, maxY};
 }
 function parkSpot() {
   const b = roamBounds();
@@ -928,7 +981,7 @@ function pickWaypoint(first) {
       y: clamp(PET.y + Math.sin(ang) * dist, b.minY, b.maxY),
     };
     if (Math.hypot(dest.x - PET.x, dest.y - PET.y) < 70) dest = {x: clamp(PET.x + 120, b.minX, b.maxX), y: PET.y};
-    if (hitsAvoid(dest.x, dest.y, 0)) return parkSpot();
+    if (hitsAvoid(dest.x, dest.y, 0) || segmentHitsHud({x: PET.x, y: PET.y}, dest)) return parkSpot();
     return dest;
   }
   const stage = $("#stage").getBoundingClientRect();
@@ -963,13 +1016,21 @@ function pickWaypoint(first) {
         p = {x: p.x, y: clamp(r.top + 6, b.minY, b.maxY)};
       }
     }
-    if (hitsAvoid(p.x, p.y, 0)) continue;
+    if (hitsAvoid(p.x, p.y, 0) || segmentHitsHud({x: PET.x, y: PET.y}, p)) continue;
     if (Math.hypot(p.x - PET.x, p.y - PET.y) > 64) return p;
   }
   return parkSpot();
 }
 function beginWalk(now, first) {
-  const dest = pickWaypoint(!!first);
+  let dest = pickWaypoint(!!first);
+  if (segmentHitsHud({x: PET.x, y: PET.y}, dest)) {
+    dest = parkSpot();
+    if (segmentHitsHud({x: PET.x, y: PET.y}, dest)) {
+      if (!hitsAvoid(dest.x, dest.y, 0)) { PET.x = dest.x; PET.y = dest.y; }
+      PET.walking = false; seg = null; restUntil = now + 700;
+      return;
+    }
+  }
   const dist = Math.max(1, Math.hypot(dest.x - PET.x, dest.y - PET.y));
   const speed = first ? 88 : (60 + Math.random() * 34);
   seg = {from: {x: PET.x, y: PET.y}, to: dest, t0: now, dur: Math.max(320, dist / speed * 1000)};
@@ -1047,6 +1108,7 @@ function renderSpider(now) {
   const reacting = petReacting;
   if (REDUCED || paused || reacting) { seg = null; PET.walking = false; }
   else if (!walkArmed) { walkArmed = true; beginWalk(now, true); nextShuffle = now + 10000 + Math.random() * 8000; }
+  if (seg && segmentHitsHud({x: PET.x, y: PET.y}, seg.to)) { seg = null; PET.walking = false; restUntil = now + 500; }
   if (seg) {
     const u = Math.max(0, Math.min(1, (now - seg.t0) / seg.dur));
     const e = easeIO(u);
