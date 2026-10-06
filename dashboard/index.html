@@ -1019,9 +1019,18 @@ function eventSample(ev) {
   const lvl = typeof ev.level === "string" ? ev.level.toLowerCase() : "";
   return lvl === "sample" || lvl === "synthetic";
 }
+const HOLDER_PCT_KEYS = ["top10_pct", "max_pct", "dev_pct"];
 function numOrNull(v) {
   if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 100) return null;
   return v;
+}
+function presentPctBad(raw) {
+  if (!raw || typeof raw !== "object") return false;
+  for (const key of HOLDER_PCT_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) continue;
+    if (numOrNull(raw[key]) == null) return true;
+  }
+  return false;
 }
 function normalizeLog(log) {
   if (!Array.isArray(log)) return [];
@@ -1041,7 +1050,7 @@ function normalizeHolder(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const reported = HOLDER_STATES.includes(raw.state) ? raw.state : "idle";
   const verdict = HOLDER_VERDICTS.includes(raw.verdict) ? raw.verdict : "";
-  // Chips follow state + verdict. Reason text never remaps a call.
+  // Chips light only for a complete Copy template. Payload reason prose is never shown.
   let state = reported;
   if (reported === "done" && !verdict) state = "insufficient";
   const called = state === "done" && !!verdict;
@@ -1052,13 +1061,13 @@ function normalizeHolder(raw) {
     state,
     verdict: called ? verdict : "",
     score,
-    reason: called && typeof raw.reason === "string" ? raw.reason : "",
     pct: called ? {
       top10_pct: numOrNull(raw.top10_pct),
       max_pct: numOrNull(raw.max_pct),
       dev_pct: numOrNull(raw.dev_pct),
     } : null,
     no_cluster: raw.no_cluster === true,
+    pctBad: presentPctBad(raw),
     log: normalizeLog(raw.log),
     is_sample: raw.is_sample === true,
     sample_ca: sampleCa,
@@ -1074,6 +1083,7 @@ function templateSpec(view) {
   const pct = view.pct || {};
   const has = (key) => typeof pct[key] === "number";
   if (view.verdict === "OK") {
+    if (view.no_cluster === true && view.pctBad) return null;
     if (has("top10_pct") && has("max_pct")) return { template: COPY.reasons.OK_MILD, keys: ["top10_pct", "max_pct"] };
     if (view.no_cluster === true && has("top10_pct")) return { template: COPY.reasons.OK_NONE, keys: ["top10_pct"] };
     return null;
@@ -1096,8 +1106,6 @@ function filledTemplate(view) {
 }
 function shownCall(view) {
   if (view.state !== "done" || !view.verdict) return false;
-  const reason = typeof view.reason === "string" ? view.reason.trim() : "";
-  if (reason) return true;
   return !!filledTemplate(view);
 }
 function reasonLine(view) {
@@ -1105,8 +1113,6 @@ function reasonLine(view) {
   if (view.state === "error") return COPY.error;
   if (view.state === "insufficient" || (view.state === "done" && !shownCall(view))) return COPY.insufficient;
   if (view.state === "done" && view.verdict) {
-    const reason = typeof view.reason === "string" ? view.reason.trim() : "";
-    if (reason) return reason;
     const line = filledTemplate(view);
     if (line) return line;
   }
@@ -1115,7 +1121,7 @@ function reasonLine(view) {
 }
 function blankHolder(log) {
   return {
-    state: "idle", verdict: "", score: null, reason: "", pct: null, no_cluster: false, log: log || [],
+    state: "idle", verdict: "", score: null, pct: null, no_cluster: false, pctBad: false, log: log || [],
     is_sample: false, sample_ca: "",
   };
 }
