@@ -902,7 +902,8 @@ function hudLane() {
   if (stage.width < 40 || stage.height < 40) return null;
   const reach = narrowReach();
   // hudRects are already padded 4px; avoidRects pad HUD by 6px. Stay inside #stage.
-  const pad = 2;
+  // No extra Y pad — at 421 / 0.70 the HUD gap is only a few px over 2*reach.
+  const pad = 0;
   let minX = stage.left + reach;
   let maxX = stage.right - reach;
   let minY = top + reach + pad;
