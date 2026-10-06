@@ -2,18 +2,21 @@
 
 Every gate in the active threshold set is evaluated and recorded with the
 field, threshold, value, distance, and what would flip it. Intent still follows
-inventory → toxic_flow → quote_env → liquidity → direction, but only when the
-snapshot and judgment are usable. A failed GET, timeout, stale print, or
-missing field yields hold with confident false. live_order is never set.
+inventory → toxic_flow → quote_env → liquidity → holder_cluster → direction,
+but only when the snapshot and judgment are usable. A failed GET, timeout,
+stale print, or missing field yields hold with confident false. Missing holder
+rows fail closed (no OK verdict). live_order is never set.
 """
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+from holders import assess_holders
+
 ROOT = Path(__file__).resolve().parent
 
-POLICY_ORDER = ("inventory", "toxic_flow", "quote_env", "liquidity")
+POLICY_ORDER = ("inventory", "toxic_flow", "quote_env", "liquidity", "holder_cluster")
 
 # Fallback if thresholds.json is missing. Keep in lockstep with that file.
 THRESHOLD_SET = {
@@ -23,6 +26,7 @@ THRESHOLD_SET = {
         {"name": "toxic_flow", "field": "toxic_flow", "op": "lt", "threshold": 0.55, "order": 2},
         {"name": "quote_env", "field": "quote_env", "op": "ge", "threshold": 0.55, "order": 3},
         {"name": "liquidity", "field": "liquidity", "op": "ge", "threshold": 1.0, "order": 4},
+        {"name": "holder_cluster", "field": "holder_cluster", "op": "lt", "threshold": 0.35, "order": 5},
     ],
 }
 
@@ -262,8 +266,12 @@ def _gate_passed(outcomes: list[dict], name: str) -> bool:
     return False
 
 
+def _gate_present(outcomes: list[dict], name: str) -> bool:
+    return any(g["name"] == name for g in outcomes)
+
+
 def intent_from_gates(snapshot: dict, judgment: dict, outcomes: list[dict]) -> dict:
-    """Same policy as the original if-chain: inventory → toxic → quote → liq → direction."""
+    """Same policy as the original if-chain, plus holder_cluster before direction."""
     if not _gate_passed(outcomes, "inventory"):
         return {"action": "flatten_or_hold", "reason": "inventory pressure", "risk_usd": 0}
     toxic = next((g["value"] for g in outcomes if g["name"] == "toxic_flow"), None)
@@ -277,6 +285,16 @@ def intent_from_gates(snapshot: dict, judgment: dict, outcomes: list[dict]) -> d
     liq_th = next((g["threshold"] for g in outcomes if g["name"] == "liquidity"), 1.0)
     if not _gate_passed(outcomes, "liquidity"):
         return {"action": "hold", "reason": f"liquidity score {liq} < {liq_th}", "risk_usd": 0}
+    # Only when the threshold set includes the gate. A missing score never reaches here
+    # as a pass: evaluate_gates fail-closes it and decide() marks the check insufficient.
+    if _gate_present(outcomes, "holder_cluster") and not _gate_passed(outcomes, "holder_cluster"):
+        cluster = next((g["value"] for g in outcomes if g["name"] == "holder_cluster"), None)
+        cluster_th = next((g["threshold"] for g in outcomes if g["name"] == "holder_cluster"), 0.35)
+        return {
+            "action": "hold",
+            "reason": f"holder cluster {_fmt_num(cluster)} not < {_fmt_num(cluster_th)}",
+            "risk_usd": 0,
+        }
     direction = judgment.get("direction")
     if direction in ("long", "short"):
         return {
@@ -295,10 +313,18 @@ def decide(snapshot: dict, judgment: dict, threshold_set: dict | None = None) ->
     does not produce a confident intent. Every gate is still recorded.
     """
     tset = threshold_set or load_threshold_set()
-    judgment = judgment or {}
-    snapshot = snapshot or {}
+    judgment = dict(judgment or {})
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    assessed = assess_holders(snapshot)
+    if assessed.get("value") is not None:
+        judgment["holder_cluster"] = assessed["value"]
     outcomes = evaluate_gates(judgment, tset)
     _stamp_source(outcomes, snapshot)
+    # Name the holder read on that gate only. A failed market GET keeps its own endpoint.
+    if isinstance(snapshot.get("holders"), dict) and assessed.get("endpoint"):
+        for gate in outcomes:
+            if gate.get("name") == "holder_cluster":
+                gate["endpoint"] = assessed["endpoint"]
     insuff = _insufficient_reason(snapshot, judgment, outcomes)
     if insuff:
         for gate in outcomes:
@@ -314,4 +340,5 @@ def decide(snapshot: dict, judgment: dict, threshold_set: dict | None = None) ->
         "gates": outcomes,
         "threshold_set_id": tset["id"],
         "data_status": status,
+        "holder_risk": assessed["holder_risk"],
     }

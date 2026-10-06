@@ -80,6 +80,8 @@ def dashboard_row(row: dict) -> dict:
     })
     if "judgment_ms" in out and "jev_ms" not in out:
         out["jev_ms"] = out["judgment_ms"]
+    # Presentational fields for the holder strip. Layout stays on the frontend.
+    out["holder_risk"] = row.get("holder_risk")
     return out
 
 
