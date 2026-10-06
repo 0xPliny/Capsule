@@ -22,7 +22,7 @@
 
 </div>
 
-**Capsule** is a local pump.fun desk: public market data in, gated judgment out, neon graph + capsule mascot on screen. Deterministic code owns math and risk; optional [TypeSafe](https://typesafe.ai) / Jev calls own the six judgment questions. Fan tool that pays respects to Pump — **not affiliated with, endorsed by, or part of Pump**.
+**Capsule** is a local pump.fun desk: public market data in, gated judgment out, a paper graph and a quiet capsule mascot on screen. Deterministic code owns math and risk; optional [TypeSafe](https://typesafe.ai) / Jev calls own the six judgment questions. Fan tool that pays respects to Pump — **not affiliated with, endorsed by, or part of Pump**.
 
 ---
 
@@ -31,15 +31,11 @@
 - **Dry-run by design** — no wallet, no trade POSTs, `live_order` is always `false`
 - **Public pump.fun data** — coins, trades, and 1m candles over plain GETs
 - **Offline demo + replay** — `--demo` and `--replay` never need pump.fun or TypeSafe
-- **Animated desk tour** — coin → judgment → gates → action, with a bright capsule mascot
+- **Paper desk tour** — coin → judgment → gates → action, with a quiet capsule mascot
 - **Gate strands** — green PASS / red FAIL on toxic flow, quote environment, liquidity, inventory
 - **CA → pump.fun** — mint links open the coin page when a mint is present
-- **Header actions** — [Donate](https://x.com/0xPliny) · [GitHub](https://github.com/0xPliny/Capsule) · [X](https://x.com/0xPliny)
+- **Header actions** — [Tips](https://x.com/0xPliny) · [GitHub](https://github.com/0xPliny/Capsule) · [X](https://x.com/0xPliny)
 - **Apache-2.0** — use it, fork it, build on it; keep secrets out of the repo
-
-<p align="center">
-  <img src="docs/capsule-mascot-tour.png" alt="Capsule mascot on the decision graph" width="780" />
-</p>
 
 ---
 
