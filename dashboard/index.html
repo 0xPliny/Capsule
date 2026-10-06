@@ -2150,28 +2150,50 @@ function syncCopyCa() {
 }
 function showCopyToast(text, ok) {
   const toast = $("#holder-copy-toast");
-  if (!toast) return;
-  toast.textContent = text;
-  toast.classList.toggle("is-ok", !!ok);
-  toast.hidden = false;
+  const btn = $("#holder-copy");
+  if (btn) btn.textContent = text;
+  if (toast) {
+    toast.textContent = text;
+    toast.classList.toggle("is-ok", !!ok);
+    toast.hidden = false;
+  }
   if (copyToastTimer) clearTimeout(copyToastTimer);
   copyToastTimer = setTimeout(() => {
-    toast.hidden = true;
-    toast.textContent = "";
-    toast.classList.remove("is-ok");
+    if (toast) {
+      toast.hidden = true;
+      toast.textContent = "";
+      toast.classList.remove("is-ok");
+    }
+    if (btn) btn.textContent = COPY.copy;
     copyToastTimer = 0;
   }, 1400);
+}
+function tryLegacyCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;left:-9999px;top:0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+function writeClipboard(text) {
+  const clip = navigator.clipboard;
+  if (clip && typeof clip.writeText === "function") {
+    return Promise.race([
+      clip.writeText(text).then(() => true).catch(() => false),
+      new Promise((resolve) => setTimeout(() => resolve(null), 500)),
+    ]).then((ok) => ok === true ? true : tryLegacyCopy(text));
+  }
+  return Promise.resolve(tryLegacyCopy(text));
 }
 function copyDeskCa() {
   const text = deskCaText();
   if (!text) return;
-  const done = (ok) => showCopyToast(ok ? COPY.copied : COPY.copyFail, ok);
-  const clip = navigator.clipboard;
-  if (clip && typeof clip.writeText === "function") {
-    clip.writeText(text).then(() => done(true)).catch(() => done(false));
-    return;
-  }
-  done(false);
+  writeClipboard(text).then((ok) => showCopyToast(ok ? COPY.copied : COPY.copyFail, ok));
 }
 function syncDeskHolderSignal(view) {
   const root = document.body;
