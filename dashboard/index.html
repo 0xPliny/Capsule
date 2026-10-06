@@ -230,12 +230,13 @@
     background:transparent; border-color:var(--border); color:var(--text-dim);
     cursor:not-allowed; pointer-events:none;
   }
+  .holder-copy-toast-slot { flex:1 0 100%; }
+  .holder-copy-toast-slot[hidden] { display:none; }
   .holder-copy-toast {
-    flex:1 0 100%; align-self:flex-start; margin:0; padding:4px 8px; width:auto;
+    display:inline-flex; align-items:center; margin:0; padding:4px 8px; width:max-content;
     background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:var(--radius);
     font:600 11px/1.2 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
   }
-  .holder-copy-toast[hidden] { display:none; }
   .holder-copy-toast.is-ok { color:var(--accent); }
   .holder-try {
     height:32px; padding:0 10px; background:transparent; color:var(--text-dim); border:1px solid var(--border);
@@ -446,7 +447,7 @@
       <button id="holder-copy" class="holder-copy" type="button" disabled aria-disabled="true"></button>
       <span class="holder-ctl" id="holder-scan-wrap"><button id="holder-scan" class="holder-scan" type="submit" disabled aria-disabled="true"></button></span>
       <span class="holder-ctl" id="holder-try-wrap"><button id="holder-try" class="holder-try" type="button" disabled aria-disabled="true"></button></span>
-      <span id="holder-copy-toast" class="holder-copy-toast" hidden role="status" aria-live="polite"></span>
+      <span class="holder-copy-toast-slot" hidden><span id="holder-copy-toast" class="holder-copy-toast" role="status" aria-live="polite"></span></span>
       <p id="holder-help" class="holder-help"></p>
     </form>
   </section>
@@ -2150,20 +2151,21 @@ function syncCopyCa() {
 }
 function showCopyToast(text, ok) {
   const toast = $("#holder-copy-toast");
+  const slot = toast && toast.parentElement;
   const btn = $("#holder-copy");
   if (btn) btn.textContent = text;
   if (toast) {
     toast.textContent = text;
     toast.classList.toggle("is-ok", !!ok);
-    toast.hidden = false;
   }
+  if (slot) slot.hidden = false;
   if (copyToastTimer) clearTimeout(copyToastTimer);
   copyToastTimer = setTimeout(() => {
     if (toast) {
-      toast.hidden = true;
       toast.textContent = "";
       toast.classList.remove("is-ok");
     }
+    if (slot) slot.hidden = true;
     if (btn) btn.textContent = COPY.copy;
     copyToastTimer = 0;
   }, 1400);
