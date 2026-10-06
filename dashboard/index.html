@@ -36,18 +36,20 @@
                border-radius:var(--radius); font:var(--w-strong) 13px/1 ui-monospace,Menlo,Consolas,monospace; cursor:pointer; }
   button#run:hover { background:#9af6bb; }
   button#run:disabled { opacity:.55; cursor:wait; }
-  #status { color:var(--dim); font-size:12px; }
+  #status { color:var(--dim); font-size:12px; flex:0 1 auto; max-width:min(36ch, 28vw);
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-  #stage { position:relative; height:clamp(340px, 36vw, 440px); margin:16px 22px 0; border-radius:var(--radius); overflow:hidden;
+  #stage { position:relative; height:clamp(300px, 36vw, 420px); margin:16px 22px 0; border-radius:var(--radius); overflow:hidden;
            border:1px solid var(--border); background:var(--stage); }
+  #stage { height:clamp(300px, min(36vw, calc(100dvh - 430px)), 420px); }
   #stage::before { content:""; position:absolute; inset:0; pointer-events:none;
            background-image:linear-gradient(var(--edge) 1px, transparent 1px), linear-gradient(90deg, var(--edge) 1px, transparent 1px);
            background-size:48px 48px; opacity:.55; }
   #dust, #web { position:absolute; inset:0; width:100%; height:100%; display:block; }
   .hud { position:absolute; z-index:3; font-size:12px; font-weight:var(--w); color:var(--dim); pointer-events:none; }
-  .hud.tl { top:12px; left:14px; } .hud.tr { top:12px; right:14px; text-align:right; }
-  .hud.bl { bottom:12px; left:14px; right:150px; display:flex; gap:10px 12px; flex-wrap:wrap; }
-  .hud.br { bottom:12px; right:14px; width:136px; text-align:right; }
+  .hud.tl { top:12px; left:14px; max-width:46%; } .hud.tr { top:12px; right:14px; max-width:46%; text-align:right; }
+  .hud.bl { bottom:12px; left:14px; right:250px; display:flex; gap:10px 12px; flex-wrap:wrap; }
+  .hud.br { bottom:12px; right:14px; width:auto; max-width:236px; text-align:right; }
   .paper-note { color:var(--text); font-weight:var(--w-strong); letter-spacing:.04em; }
   .hud .title { color:var(--text); font-size:13px; font-weight:var(--w-strong); }
   #hud-coin { color:var(--dim); margin-top:3px; }
@@ -101,9 +103,13 @@
   .ripple { fill:none; stroke-width:1.25; transform-box:fill-box; transform-origin:center; animation:ripple .8s ease-out forwards; }
   @keyframes ripple { from { transform:scale(.4); opacity:.7; } to { transform:scale(1); opacity:0; } }
 
-  /* Desk pet only. Cream/emerald pill head; desk chrome stays mint. Never takes clicks. */
-  #desk-pet { position:fixed; z-index:6; left:50%; top:38%; width:0; height:0; overflow:visible; pointer-events:none; }
-  #pet-svg { position:absolute; left:-70px; top:-70px; overflow:visible; display:block; }
+  /* Desk pet. Cream/emerald pill head; desk chrome stays mint. Hit target is the spider only. */
+  #desk-pet { position:fixed; z-index:6; left:50%; top:38%; width:0; height:0; overflow:visible;
+              pointer-events:auto; cursor:pointer; touch-action:manipulation; }
+  #desk-pet[data-reacting="1"] { cursor:default; }
+  #desk-pet:focus-visible { outline:none; }
+  #desk-pet:focus-visible #pet-svg { outline:1px solid var(--accent); outline-offset:4px; }
+  #pet-svg { position:absolute; left:-70px; top:-70px; overflow:visible; display:block; pointer-events:auto; cursor:inherit; }
   #pet-legs .leg-edge { fill:none; stroke:#1F4D3D; stroke-width:4.6; stroke-linecap:round; stroke-linejoin:round; }
   #pet-legs .leg-line { fill:none; stroke:#4FCB86; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round;
                         filter:drop-shadow(0 0 8px rgba(79,203,134,.55)); }
@@ -111,8 +117,30 @@
   #spider-body { filter:drop-shadow(0 0 6px rgba(79,203,134,.4)); }
   .foot-ripple { fill:none; stroke:#4FCB86; stroke-width:1.5; transform-box:fill-box; transform-origin:center; animation:footrip .6s ease-out forwards; }
   @keyframes footrip { from { transform:scale(.35); opacity:.7; } to { transform:scale(1.6); opacity:0; } }
+  @keyframes pet-hop {
+    0%   { transform: translateY(0) scale(1, 1); }
+    35%  { transform: translateY(-10px) scale(1.04, 0.92); }
+    70%  { transform: translateY(0) scale(0.98, 1.04); }
+    100% { transform: translateY(0) scale(1, 1); }
+  }
+  @keyframes pet-wink {
+    0%, 100% { transform: scaleY(1); }
+    45% { transform: scaleY(0.15); }
+  }
+  #desk-pet.pet-react-hop #pet-bob {
+    animation: pet-hop 0.9s ease-out;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  #desk-pet.pet-react-hop #pet-eyes { animation: pet-wink 0.35s ease 0.16s; }
+  #desk-pet.pet-react-wink #pet-eyes { animation: pet-wink 0.35s ease; }
+  #desk-pet.pet-react-hop #pet-eyes,
+  #desk-pet.pet-react-wink #pet-eyes {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
 
-  #bubble { position:absolute; z-index:4; left:0; top:0; max-width:320px; padding:8px 10px; border-radius:var(--radius);
+  #bubble { position:absolute; z-index:4; left:0; top:0; max-width:min(320px, 46%); padding:8px 10px; border-radius:var(--radius);
             background:var(--panel); color:var(--text); border:1px solid var(--border);
             font:var(--w) 13px/1.4 ui-monospace,Menlo,Consolas,monospace; opacity:0; transition:opacity .2s; pointer-events:none; }
   #bubble.show { opacity:1; }
@@ -246,7 +274,8 @@
   a.mint-link:hover, a.mint-link:focus-visible { color:var(--text); }
   a.mint-link .ext { font-size:.85em; margin-left:3px; color:var(--dim); text-decoration:none; }
   .hud a.mint-link { pointer-events:auto; }
-  #fx, #trail, #gstrands, #mesh, #desk-pet, #desk-pet * { pointer-events:none; }
+  #fx, #trail, #gstrands, #mesh { pointer-events:none; }
+  #pet-fx { pointer-events:none; }
   #web a.svg-mint { cursor:pointer; }
   #web a.svg-mint .card-mint { fill:var(--accent); font-size:11px; font-weight:var(--w-strong); text-decoration:underline; }
   #web a.svg-mint:hover .card-mint, #web a.svg-mint:focus .card-mint { fill:var(--text); }
@@ -267,8 +296,21 @@
   button.quiet:disabled { opacity:.55; cursor:wait; }
   #watch-list { list-style:none; margin:0; padding:0; }
   #watch-list li { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid var(--line); }
+  @media (max-width: 640px) {
+    header { padding:10px 12px; gap:8px; }
+    #stage { margin:12px 12px 0; height:clamp(300px, 72vw, 380px); }
+    main { padding:12px 12px 22px; }
+    .hud.tl, .hud.tr { max-width:48%; }
+    .hud.bl { left:12px; right:12px; bottom:50px; }
+    .hud.br { left:12px; right:12px; bottom:10px; width:auto; max-width:none; text-align:left; }
+    #prog { width:88px; }
+    #bubble { max-width:min(200px, 54%); }
+    .holder-ca { min-width:0; flex:1 1 100%; max-width:none; }
+    #evidence { grid-template-columns:1fr; }
+  }
   @media (prefers-reduced-motion: reduce) {
-    .pop, .ripple, .foot-ripple, #bubble .txt::after, .typing i, #trail, .edge.route, .holder-strip.is-scanning .chip { animation:none; }
+    .pop, .ripple, .foot-ripple, #bubble .txt::after, .typing i, #trail, .edge.route, .holder-strip.is-scanning .chip,
+    #desk-pet.pet-react-hop #pet-bob { animation:none; }
   }
 </style>
 </head>
@@ -298,7 +340,7 @@
   <button id="run" type="button">Run dry-run</button>
 </header>
 
-<div id="desk-pet" data-holder-risk="ok" aria-hidden="true">
+<div id="desk-pet" data-holder-risk="ok" role="button" tabindex="0" aria-label="Poke the desk spider">
   <svg id="pet-svg" viewBox="-70 -70 140 140" width="140" height="140">
     <defs>
       <radialGradient id="abdFill" cx="34%" cy="30%" r="72%">
@@ -716,8 +758,9 @@ function drawEdges() {
 }
 
 // ------------------------------------------------------------- capsule spider: 8-leg desk pet
-// White cephalothorax + abdomen, mint legs, friendly eyes. Roams the viewport below the header.
+// Cream/emerald pill head, solid black oval eyes, thin smile. Roams below the header.
 // 2-bone IK (hip→knee→foot), alternating groups of 4. prefers-reduced-motion: planted, no roam.
+// Click / Enter / Space: hop + wink (~900ms). Reduced motion: wink only. Cooldown 1.5s from start.
 const PET = { x: 0, y: 0, h: 0.2, hT: 0.2, walking: false };
 const L1 = 16, L2 = 18, REACH = L1 + L2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -725,6 +768,9 @@ const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI;
 const easeIO = (u) => u * u * (3 - 2 * u);
 let LEGS = [], seg = null, restUntil = 0, hopUntil = 0, walkArmed = false, meshFrame = [];
 let nextBlink = 0, blinkT0 = -1e9, nextShuffle = 0;
+let petReacting = false, petCoolUntil = 0, petReactTimer = 0;
+const SMILE_IDLE = "M21.2,-5.2 Q24,-3.4 26.8,-5.2";
+const SMILE_DEEP = "M20.9,-5.6 Q24,-1.8 27.1,-5.6";
 
 function holderPaused() {
   const v = String(document.body.dataset.holderRisk || "ok").toUpperCase();
@@ -732,12 +778,74 @@ function holderPaused() {
 }
 function roamBounds() {
   const header = document.querySelector("header").getBoundingClientRect();
-  const inset = 12, half = 55;
+  const inset = 12, half = 64;
   const minY = Math.max(header.bottom + 8, inset) + half;
   const maxY = Math.max(minY + 48, innerHeight - inset - half);
   const minX = inset + half;
   const maxX = Math.max(minX + 48, innerWidth - inset - half);
   return { minX, maxX, minY, maxY };
+}
+function avoidRects() {
+  const out = [];
+  const add = (el, pad) => {
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    const p = pad || 0;
+    out.push({l: r.left - p, t: r.top - p, r: r.right + p, b: r.bottom + p});
+  };
+  add(document.querySelector("header"), 4);
+  add($("#run"), 14);
+  add(document.querySelector(".mode-badge"), 8);
+  document.querySelectorAll("#stage .hud").forEach((el) => add(el, 6));
+  const cap = $("#bubble");
+  if (cap && cap.classList.contains("show")) add(cap, 6);
+  add($("#holder-chips"), 8);
+  add($("#holder-strip"), 2);
+  return out;
+}
+function hitsAvoid(x, y, pad) {
+  const half = 70 + (pad || 0);
+  const s = {l: x - half, t: y - half, r: x + half, b: y + half};
+  for (const a of avoidRects()) {
+    if (s.r > a.l && s.l < a.r && s.b > a.t && s.t < a.b) return true;
+  }
+  return false;
+}
+function parkSpot() {
+  const b = roamBounds();
+  const stage = $("#stage").getBoundingClientRect();
+  const narrow = innerWidth <= 640;
+  const spots = [];
+  if (stage.width > 40) {
+    const xs = narrow ? [0.78, 0.7, 0.5] : [0.78, 0.62, 0.4];
+    const ys = narrow ? [0.4, 0.34, 0.48] : [0.4, 0.52, 0.3];
+    for (const xk of xs) for (const yk of ys) {
+      spots.push({x: stage.left + stage.width * xk, y: stage.top + stage.height * yk});
+    }
+  }
+  spots.push({x: b.maxX - 10, y: b.minY + 36}, {x: b.minX + 12, y: b.minY + 36});
+  for (const s of spots) {
+    const x = clamp(s.x, b.minX, b.maxX);
+    const y = clamp(s.y, b.minY, b.maxY);
+    if (!hitsAvoid(x, y, 0)) return {x, y};
+  }
+  return {x: clamp((narrow ? b.maxX - 10 : (b.minX + b.maxX) / 2), b.minX, b.maxX), y: clamp(b.minY + 28, b.minY, b.maxY)};
+}
+let spiderSettled = false;
+function settleOffChrome() {
+  if (spiderSettled || petReacting) return;
+  if (!hitsAvoid(PET.x, PET.y, 0)) { spiderSettled = true; return; }
+  const spot = parkSpot();
+  if (hitsAvoid(spot.x, spot.y, 0)) return;
+  PET.x = spot.x; PET.y = spot.y;
+  seg = null; PET.walking = false;
+  restUntil = performance.now() + (REDUCED ? 1e9 : 500);
+  if (LEGS.length) LEGS.forEach(l => { l.foot = clampReach(localToWorld(l.rest)); l.stepping = false; });
+  const host = $("#desk-pet");
+  host.style.left = "0px"; host.style.top = "0px";
+  host.style.transform = `translate(${PET.x.toFixed(1)}px,${PET.y.toFixed(1)}px)`;
+  spiderSettled = true;
 }
 function localToWorld(p) {
   const c = Math.cos(PET.h), s = Math.sin(PET.h);
@@ -750,11 +858,9 @@ function worldToLocal(p) {
 }
 function plantVisible() {
   const b = roamBounds();
-  const stage = $("#stage").getBoundingClientRect();
-  const sx = stage.width > 40 ? stage.left + stage.width * (REDUCED ? 0.62 : 0.64) : (b.minX + b.maxX) / 2;
-  const sy = stage.height > 40 ? stage.top + stage.height * (REDUCED ? 0.55 : 0.58) : b.minY + 36;
-  PET.x = clamp(sx, b.minX, b.maxX);
-  PET.y = clamp(sy, b.minY, b.maxY);
+  const spot = parkSpot();
+  PET.x = clamp(spot.x, b.minX, b.maxX);
+  PET.y = clamp(spot.y, b.minY, b.maxY);
   PET.h = REDUCED ? -0.4 : 0.25;
   PET.hT = PET.h;
   PET.walking = false;
@@ -816,6 +922,7 @@ function pickWaypoint(first) {
       y: clamp(PET.y + Math.sin(ang) * dist, b.minY, b.maxY),
     };
     if (Math.hypot(dest.x - PET.x, dest.y - PET.y) < 70) dest = {x: clamp(PET.x + 120, b.minX, b.maxX), y: PET.y};
+    if (hitsAvoid(dest.x, dest.y, 0)) return parkSpot();
     return dest;
   }
   const stage = $("#stage").getBoundingClientRect();
@@ -850,9 +957,10 @@ function pickWaypoint(first) {
         p = {x: p.x, y: clamp(r.top + 6, b.minY, b.maxY)};
       }
     }
+    if (hitsAvoid(p.x, p.y, 0)) continue;
     if (Math.hypot(p.x - PET.x, p.y - PET.y) > 64) return p;
   }
-  return {x: b.minX + Math.random() * (b.maxX - b.minX), y: b.minY + Math.random() * (b.maxY - b.minY)};
+  return parkSpot();
 }
 function beginWalk(now, first) {
   const dest = pickWaypoint(!!first);
@@ -887,10 +995,51 @@ function footRipple(world) {
   setTimeout(() => c.remove(), 650);
 }
 let lastPet = performance.now();
+function endSpiderReact() {
+  const pet = $("#desk-pet");
+  pet.classList.remove("pet-react-hop", "pet-react-wink");
+  delete pet.dataset.reacting;
+  const smile = $("#pet-smile");
+  if (smile) smile.setAttribute("d", SMILE_IDLE);
+  petReacting = false;
+  if (!REDUCED && !holderPaused()) restUntil = performance.now() + 80;
+}
+function spiderReact() {
+  const now = performance.now();
+  if (petReacting || now < petCoolUntil) return;
+  petReacting = true;
+  petCoolUntil = now + 1500;
+  const pet = $("#desk-pet");
+  pet.dataset.reacting = "1";
+  seg = null;
+  PET.walking = false;
+  const ms = REDUCED ? 380 : 900;
+  $("#pet-bob").removeAttribute("transform");
+  $("#pet-eyes").removeAttribute("transform");
+  if (REDUCED) pet.classList.add("pet-react-wink");
+  else {
+    pet.classList.add("pet-react-hop");
+    const smile = $("#pet-smile");
+    if (smile) smile.setAttribute("d", SMILE_DEEP);
+  }
+  clearTimeout(petReactTimer);
+  petReactTimer = setTimeout(endSpiderReact, ms);
+}
+function bindSpiderHit() {
+  const pet = $("#desk-pet");
+  pet.addEventListener("click", (e) => { e.stopPropagation(); spiderReact(); });
+  pet.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    e.stopPropagation();
+    spiderReact();
+  });
+}
 function renderSpider(now) {
   const dt = Math.min(40, now - lastPet); lastPet = now;
   const paused = holderPaused();
-  if (REDUCED || paused) { seg = null; PET.walking = false; }
+  const reacting = petReacting;
+  if (REDUCED || paused || reacting) { seg = null; PET.walking = false; }
   else if (!walkArmed) { walkArmed = true; beginWalk(now, true); nextShuffle = now + 10000 + Math.random() * 8000; }
   if (seg) {
     const u = Math.max(0, Math.min(1, (now - seg.t0) / seg.dur));
@@ -902,8 +1051,12 @@ function renderSpider(now) {
       PET.x = seg.to.x; PET.y = seg.to.y; PET.walking = false; seg = null;
       restUntil = now + 800 + Math.random() * 1200;
       hopUntil = now + 260;
+      if (hitsAvoid(PET.x, PET.y, 0)) restUntil = now + 40;
     }
-  } else if (!REDUCED && !paused && now >= restUntil) {
+  } else if (!REDUCED && !paused && !reacting && hitsAvoid(PET.x, PET.y, 0)) {
+    restUntil = now;
+    beginWalk(now, false);
+  } else if (!REDUCED && !paused && !reacting && now >= restUntil) {
     if (now > nextShuffle) { nextShuffle = now + 10000 + Math.random() * 8000; beginWalk(now, true); }
     else beginWalk(now, false);
   }
@@ -918,24 +1071,26 @@ function renderSpider(now) {
   host.style.left = "0px"; host.style.top = "0px";
   host.style.transform = `translate(${PET.x.toFixed(1)}px,${PET.y.toFixed(1)}px)`;
   $("#pet-facing").setAttribute("transform", `rotate(${(PET.h * 180 / Math.PI).toFixed(2)})`);
-  let bob = 0, hop = 0;
-  if (!REDUCED) {
-    const amp = paused ? 1.1 : 2.3;
-    bob = Math.sin(now / 980) * amp;
-    if (now < hopUntil) hop = Math.sin((1 - (hopUntil - now) / 280) * Math.PI) * -7;
+  if (!reacting) {
+    let bob = 0, hop = 0;
+    if (!REDUCED) {
+      const amp = paused ? 1.1 : 2.3;
+      bob = Math.sin(now / 980) * amp;
+      if (now < hopUntil) hop = Math.sin((1 - (hopUntil - now) / 280) * Math.PI) * -7;
+    }
+    $("#pet-bob").setAttribute("transform", `translate(0,${(bob + hop).toFixed(2)})`);
+    if (!REDUCED && now > nextBlink) { blinkT0 = now; nextBlink = now + 2500 + Math.random() * 1500; }
+    const bu = (now - blinkT0) / 110;
+    const blink = (!REDUCED && bu >= 0 && bu < 1) ? Math.max(0.12, 1 - Math.sin(Math.PI * bu) * 0.88) : 1;
+    $("#pet-eyes").setAttribute("transform", `translate(24,-9.5) scale(1,${blink.toFixed(3)}) translate(-24,9.5)`);
   }
-  $("#pet-bob").setAttribute("transform", `translate(0,${(bob + hop).toFixed(2)})`);
-  if (!REDUCED && now > nextBlink) { blinkT0 = now; nextBlink = now + 2500 + Math.random() * 1500; }
-  const bu = (now - blinkT0) / 110;
-  const blink = (!REDUCED && bu >= 0 && bu < 1) ? Math.max(0.12, 1 - Math.sin(Math.PI * bu) * 0.88) : 1;
-  $("#pet-eyes").setAttribute("transform", `translate(24,-9.5) scale(1,${blink.toFixed(3)}) translate(-24,9.5)`);
   refreshMesh();
   const fwd = {x: Math.cos(PET.h), y: Math.sin(PET.h)};
   const stepping = [0, 0];
   LEGS.forEach(l => { if (l.stepping) stepping[l.group]++; });
   for (const l of LEGS) {
     const hip = localToWorld(l.hip);
-    if (REDUCED || paused) {
+    if (REDUCED || paused || reacting) {
       l.stepping = false;
       l.foot = clampReach(localToWorld(l.rest));
     } else if (!l.stepping) {
@@ -977,6 +1132,7 @@ function renderSpider(now) {
   if (!REDUCED) requestAnimationFrame(renderSpider);
 }
 function bootSpider() {
+  bindSpiderHit();
   buildLegs();
   plantVisible();
   LEGS.forEach(l => { l.foot = clampReach(localToWorld(l.rest)); });
@@ -1005,8 +1161,15 @@ function positionBubble() {
   let left = sx + 28 * k, top = sy - bh - 62 * k;
   if (left + bw > st.width - 10) left = sx - 52 * k - bw;
   if (top < 40) top = sy + 30 * k;
-  left = Math.max(10, Math.min(st.width - bw - 10, left)); top = Math.max(36, Math.min(st.height - bh - 30, top));
+  if (st.width < 680) {
+    const lane = Math.max(150, st.width * 0.56);
+    if (left + bw > lane - 8) left = Math.max(10, lane - bw - 8);
+  }
+  const foot = st.width < 680 ? 112 : 30;
+  left = Math.max(10, Math.min(st.width - bw - 10, left));
+  top = Math.max(36, Math.min(st.height - bh - foot, top));
   bubble.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px)`;
+  settleOffChrome();
 }
 function sayTyping() { bubbleType++; bubble.className = "show"; bubble.innerHTML = `<span class="who">Capsule · paper</span><span class="typing"><i></i><i></i><i></i></span>`; }
 async function say(text, mood, token) {
