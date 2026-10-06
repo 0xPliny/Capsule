@@ -219,6 +219,25 @@
     height:32px; padding:0 12px; background:var(--accent); color:var(--bg); border:1px solid var(--accent);
     border-radius:var(--radius); cursor:pointer; font:600 13px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
   }
+  .holder-copy {
+    height:32px; padding:6px 10px; background:transparent; color:var(--accent);
+    border:1px solid var(--accent); border-radius:var(--radius); cursor:pointer;
+    font:600 13px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  }
+  .holder-copy:hover, .holder-copy:focus-visible { background:rgba(134,239,172,.12); border-color:var(--accent); }
+  .holder-copy:active { background:rgba(134,239,172,.2); }
+  .holder-copy:disabled {
+    background:transparent; border-color:var(--border); color:var(--text-dim);
+    cursor:not-allowed; pointer-events:none;
+  }
+  .holder-copy-toast-slot { flex:1 0 100%; }
+  .holder-copy-toast-slot[hidden] { display:none; }
+  .holder-copy-toast {
+    display:inline-flex; align-items:center; margin:0; padding:4px 8px; width:max-content;
+    background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:var(--radius);
+    font:600 11px/1.2 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  }
+  .holder-copy-toast.is-ok { color:var(--accent); }
   .holder-try {
     height:32px; padding:0 10px; background:transparent; color:var(--text-dim); border:1px solid var(--border);
     border-radius:var(--radius); cursor:pointer; font:400 13px/1 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
@@ -308,6 +327,7 @@
     #bubble { max-width:min(200px, 54%); }
     #pet-svg { transform:scale(0.85); transform-origin:center; }
     .holder-ca { min-width:0; flex:1 1 100%; max-width:none; }
+    .holder-copy, .holder-scan, .holder-try { flex:0 0 auto; }
     #evidence { grid-template-columns:1fr; }
   }
   @media (max-width: 480px) {
@@ -424,8 +444,10 @@
     <form id="holder-form" class="holder-sample" method="get" action="#" autocomplete="off">
       <span id="holder-sample-pill" class="sample-pill" hidden></span>
       <input id="holder-ca" class="holder-ca" type="text" autocomplete="off" spellcheck="false" maxlength="128" autocapitalize="off" readonly aria-readonly="true">
+      <button id="holder-copy" class="holder-copy" type="button" disabled aria-disabled="true"></button>
       <span class="holder-ctl" id="holder-scan-wrap"><button id="holder-scan" class="holder-scan" type="submit" disabled aria-disabled="true"></button></span>
       <span class="holder-ctl" id="holder-try-wrap"><button id="holder-try" class="holder-try" type="button" disabled aria-disabled="true"></button></span>
+      <span class="holder-copy-toast-slot" hidden><span id="holder-copy-toast" class="holder-copy-toast" role="status" aria-live="polite"></span></span>
       <p id="holder-help" class="holder-help"></p>
     </form>
   </section>
@@ -563,6 +585,8 @@ function actionClass(a) { if (!a) return "dim"; if (a.startsWith("paper_")) retu
 // ------------------------------------------------------------- panels
 function renderPanels(row) {
   if (!row) {
+    deskMint = "";
+    syncCopyCa();
     $("#coin").innerHTML = "<div>status</div><div>No decisions logged yet. Click Run dry-run.</div>";
     $("#insuff").innerHTML = "";
     $("#gates").innerHTML = `<div class="dim">no gates evaluated</div>`;
@@ -571,6 +595,9 @@ function renderPanels(row) {
     return;
   }
   const s = row.snapshot || {}, c = s.coin || {}, j = row.judgment || {}, d = rowIntent(row);
+  const mint = c.mint || s.mint;
+  deskMint = typeof mint === "string" ? mint.trim() : "";
+  syncCopyCa();
   const live = !!row.live_order;
   const riskRaw = String((row.holder_risk || (row.judgment && row.judgment.holder_risk) || "ok")).toLowerCase();
   document.body.dataset.holderRisk = (riskRaw === "risky" || riskRaw === "danger") ? riskRaw : "ok";
@@ -834,6 +861,9 @@ function avoidRects() {
   if (speech) out.push({l: speech.l, t: speech.t, r: speech.r, b: speech.b});
   add($("#holder-chips"), 8);
   add($("#holder-strip"), 2);
+  add($("#holder-copy"), 8);
+  add($("#holder-scan"), 8);
+  add($("#holder-try"), 8);
   return out;
 }
 function hitsAvoid(x, y, pad) {
@@ -1831,6 +1861,11 @@ const COPY = {
   samplePill: "SAMPLE",
   sampleTooltip: "Demo address chosen by Capsule to show how the scan works.",
   caPlaceholder: "Paste a contract address (CA)",
+  copy: "Copy CA",
+  copyAria: "Copy contract address",
+  copied: "Copied",
+  copyFail: "Couldn't copy",
+  copyEmpty: "Paste a contract address first",
   scan: "Scan holders",
   trySample: "Try sample",
   helper: "Read-only. Public holder data only. No wallet, no keys, no orders.",
@@ -1847,6 +1882,8 @@ const HOLDER_SAMPLE_CA = "PaperDemoMint111111111111111111111111111";
 let holderSampleCa = HOLDER_SAMPLE_CA;
 let holderPauseSig = "";
 let holderView = blankHolder([]);
+let deskMint = "";
+let copyToastTimer = 0;
 
 function eventSample(ev) {
   if (!ev || typeof ev !== "object") return false;
@@ -2032,6 +2069,7 @@ function renderHolder(view) {
   renderCrawlerLog(view);
   renderSamplePill();
   lockAddressScan();
+  syncCopyCa();
 }
 function mountHolderCopy() {
   $("#holder-label").textContent = COPY.stripTitle;
@@ -2048,12 +2086,15 @@ function mountHolderCopy() {
   const ca = $("#holder-ca");
   ca.placeholder = COPY.caPlaceholder;
   ca.setAttribute("aria-label", COPY.caPlaceholder);
-  const scanBtn = $("#holder-scan"), tryBtn = $("#holder-try");
+  const scanBtn = $("#holder-scan"), tryBtn = $("#holder-try"), copyBtn = $("#holder-copy");
   scanBtn.textContent = COPY.scan;
   tryBtn.textContent = COPY.trySample;
+  copyBtn.textContent = COPY.copy;
+  copyBtn.setAttribute("aria-label", COPY.copyAria);
   $("#holder-scan-wrap").title = COPY.scansPending;
   $("#holder-try-wrap").title = COPY.scansPending;
   lockAddressScan();
+  syncCopyCa();
   const pill = $("#holder-sample-pill");
   pill.textContent = COPY.samplePill;
   pill.title = COPY.sampleTooltip;
@@ -2094,6 +2135,68 @@ function lockAddressScan() {
     ca.setAttribute("aria-readonly", "true");
   }
 }
+function deskCaText() {
+  const field = ($("#holder-ca") && $("#holder-ca").value || "").trim();
+  if (field) return field;
+  return (deskMint || "").trim();
+}
+function syncCopyCa() {
+  const btn = $("#holder-copy");
+  if (!btn) return;
+  const has = !!deskCaText();
+  btn.disabled = !has;
+  btn.setAttribute("aria-disabled", has ? "false" : "true");
+  if (has) btn.removeAttribute("title");
+  else btn.title = COPY.copyEmpty;
+}
+function showCopyToast(text, ok) {
+  const toast = $("#holder-copy-toast");
+  const slot = toast && toast.parentElement;
+  const btn = $("#holder-copy");
+  if (btn) btn.textContent = text;
+  if (toast) {
+    toast.textContent = text;
+    toast.classList.toggle("is-ok", !!ok);
+  }
+  if (slot) slot.hidden = false;
+  if (copyToastTimer) clearTimeout(copyToastTimer);
+  copyToastTimer = setTimeout(() => {
+    if (toast) {
+      toast.textContent = "";
+      toast.classList.remove("is-ok");
+    }
+    if (slot) slot.hidden = true;
+    if (btn) btn.textContent = COPY.copy;
+    copyToastTimer = 0;
+  }, 1400);
+}
+function tryLegacyCopy(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.cssText = "position:fixed;left:-9999px;top:0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+function writeClipboard(text) {
+  const clip = navigator.clipboard;
+  if (clip && typeof clip.writeText === "function") {
+    return Promise.race([
+      clip.writeText(text).then(() => true).catch(() => false),
+      new Promise((resolve) => setTimeout(() => resolve(null), 500)),
+    ]).then((ok) => ok === true ? true : tryLegacyCopy(text));
+  }
+  return Promise.resolve(tryLegacyCopy(text));
+}
+function copyDeskCa() {
+  const text = deskCaText();
+  if (!text) return;
+  writeClipboard(text).then((ok) => showCopyToast(ok ? COPY.copied : COPY.copyFail, ok));
+}
 function syncDeskHolderSignal(view) {
   const root = document.body;
   const pause = shownCall(view) && (view.verdict === "RISKY" || view.verdict === "DANGER");
@@ -2125,7 +2228,8 @@ function bindHolder() {
   $("#holder-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
   });
-  $("#holder-ca").addEventListener("input", () => renderSamplePill());
+  $("#holder-ca").addEventListener("input", () => { renderSamplePill(); syncCopyCa(); });
+  $("#holder-copy").addEventListener("click", copyDeskCa);
 }
 mountHolderCopy();
 renderHolder(holderView);
