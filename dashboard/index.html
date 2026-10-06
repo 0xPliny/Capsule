@@ -838,10 +838,10 @@ function boxHits(x, y, rects, half) {
   const s = {l: x - half, t: y - half, r: x + half, b: y + half};
   return rects.some((a) => s.r > a.l && s.l < a.r && s.b > a.t && s.t < a.b);
 }
-// Phone stage legend is full width, so a straight roam between stops cuts it.
-// Keep the whole segment out of .hud, not just the endpoints.
+// At <=640 the stage legend is full width, so a straight roam between stops cuts it.
+// Sample the whole segment, not just the stops, and keep the lane off .hud.
 function segmentHitsHud(a, b) {
-  if (!a || !b || innerWidth > 520) return false;
+  if (!a || !b || innerWidth > 640) return false;
   const rects = hudRects();
   if (!rects.length) return false;
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
@@ -853,7 +853,7 @@ function segmentHitsHud(a, b) {
   return false;
 }
 function hudLane() {
-  if (innerWidth > 520) return null;
+  if (innerWidth > 640) return null;
   const stage = $("#stage").getBoundingClientRect();
   if (stage.width < 40 || stage.height < 40) return null;
   const reach = 76;
