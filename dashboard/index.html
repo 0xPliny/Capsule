@@ -348,7 +348,7 @@
 <div id="desk-pet" data-holder-risk="ok" role="button" tabindex="0" aria-label="Poke the desk spider">
   <svg id="pet-svg" viewBox="-70 -70 140 140" width="140" height="140">
     <defs>
-      <radialGradient id="abdFill" cx="34%" cy="30%" r="72%">
+      <radialGradient id="abdFill" cx="50%" cy="28%" r="72%">
         <stop offset="0" stop-color="#D8FFE9"/>
         <stop offset=".28" stop-color="#7EE0AA"/>
         <stop offset=".62" stop-color="#4FCB86"/>
@@ -374,15 +374,15 @@
     <g id="pet-facing">
       <g id="pet-legs"></g>
       <g id="pet-bob">
-        <g id="spider-body">
-          <ellipse id="pet-abd" cx="-16" cy="4" rx="28" ry="36" fill="url(#abdFill)" stroke="#1F4D3D" stroke-width="1.7"/>
-          <ellipse cx="-28" cy="-12" rx="9" ry="4.5" fill="#F5F0E6" opacity=".72" transform="rotate(-32 -28 -12)"/>
-          <ellipse cx="-6" cy="18" rx="12" ry="6" fill="#F5F0E6" opacity=".22"/>
+        <g id="spider-body" transform="translate(-24,0)">
+          <ellipse id="pet-abd" cx="24" cy="22" rx="22" ry="20" fill="url(#abdFill)" stroke="#1F4D3D" stroke-width="1.7"/>
+          <ellipse cx="16" cy="12" rx="8" ry="4" fill="#F5F0E6" opacity=".72"/>
+          <ellipse cx="24" cy="30" rx="10" ry="5" fill="#F5F0E6" opacity=".22"/>
           <path d="M9,-14 L9,8 A15,15 0 0 0 39,8 L39,-14 A15,15 0 0 0 9,-14 Z" fill="url(#pillEm)" stroke="#1F4D3D" stroke-width="1.7"/>
           <path d="M9,-3 L9,-14 A15,15 0 0 1 39,-14 L39,-3 Z" fill="url(#pillCream)"/>
-          <ellipse cx="6" cy="12" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(58 6 12)"/>
-          <ellipse cx="44" cy="10" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(-36 44 10)"/>
-          <ellipse cx="20" cy="-20" rx="7" ry="3.1" fill="#FFFFFF" opacity=".78" transform="rotate(-28 20 -20)"/>
+          <ellipse cx="9" cy="14" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(48 9 14)"/>
+          <ellipse cx="39" cy="14" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(-48 39 14)"/>
+          <ellipse cx="24" cy="-22" rx="7" ry="3.1" fill="#FFFFFF" opacity=".78"/>
           <ellipse class="pet-blush" cx="13.6" cy="-5.6" rx="3.0" ry="2.0" fill="#FFB4C0" opacity=".85"/>
           <ellipse class="pet-blush" cx="34.4" cy="-5.6" rx="3.0" ry="2.0" fill="#FFB4C0" opacity=".85"/>
           <g id="pet-eyes">
@@ -770,9 +770,10 @@ function drawEdges() {
 
 // ------------------------------------------------------------- capsule spider: 8-leg desk pet
 // Cream/emerald pill head, solid black oval eyes, thin smile. Roams below the header.
+// Front-on lock: #pet-facing never takes walk yaw. PET.h still aims which feet step.
 // 2-bone IK (hip→knee→foot), alternating groups of 4. prefers-reduced-motion: same bubble-free park, no roam.
 // Click / Enter / Space: hop + wink (~900ms). Reduced motion: wink only. Cooldown 1.5s from start.
-const PET = { x: 0, y: 0, h: 0.2, hT: 0.2, walking: false };
+const PET = { x: 0, y: 0, h: 0.2, hT: 0.2, walking: false, tuck: 1 };
 const L1 = 16, L2 = 18, REACH = L1 + L2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
@@ -1006,20 +1007,24 @@ function settleOffChrome() {
   PET.x = spot.x; PET.y = spot.y;
   seg = null; PET.walking = false;
   restUntil = performance.now() + (REDUCED ? 1e9 : 500);
-  if (LEGS.length) LEGS.forEach(l => { l.foot = clampReach(localToWorld(l.rest)); l.stepping = false; });
+  if (LEGS.length) LEGS.forEach(l => { l.foot = clampReach(restWorld(l)); l.stepping = false; });
   const host = $("#desk-pet");
   host.style.left = "0px"; host.style.top = "0px";
   host.style.transform = `translate(${PET.x.toFixed(1)}px,${PET.y.toFixed(1)}px)`;
   spiderSettled = true;
 }
 function localToWorld(p) {
-  const c = Math.cos(PET.h), s = Math.sin(PET.h);
-  return { x: PET.x + p.x * c - p.y * s, y: PET.y + p.x * s + p.y * c };
+  return { x: PET.x + p.x, y: PET.y + p.y };
 }
 function worldToLocal(p) {
-  const c = Math.cos(PET.h), s = Math.sin(PET.h);
-  const dx = p.x - PET.x, dy = p.y - PET.y;
-  return { x: dx * c + dy * s, y: -dx * s + dy * c };
+  return { x: p.x - PET.x, y: p.y - PET.y };
+}
+function restLocal(l) {
+  const k = PET.tuck || 1;
+  return {x: l.rest.x * k, y: l.rest.y * k};
+}
+function restWorld(l) {
+  return localToWorld(restLocal(l));
 }
 function plantVisible() {
   const b = roamBounds();
@@ -1037,7 +1042,7 @@ function plantFeet() {
     l.stepping = false;
     l.from = null;
     l.to = null;
-    l.foot = clampFootTarget(localToWorld(l.rest));
+    l.foot = clampFootTarget(restWorld(l));
   }
 }
 function visualOf(p) {
@@ -1060,10 +1065,10 @@ function buildLegs() {
   const host = $("#pet-legs"); host.innerHTML = "";
   LEGS = [];
   const spec = [
-    { hip: {x: 26, y: 12}, rest: {x: 47, y: 18} },
-    { hip: {x: 6, y: 18}, rest: {x: 14, y: 50} },
-    { hip: {x: -16, y: 22}, rest: {x: -12, y: 50} },
-    { hip: {x: -30, y: 12}, rest: {x: -47, y: 16} },
+    { hip: {x: 16, y: 10}, rest: {x: 40, y: 16} },
+    { hip: {x: 8, y: 18}, rest: {x: 16, y: 46} },
+    { hip: {x: -8, y: 18}, rest: {x: -16, y: 46} },
+    { hip: {x: -16, y: 10}, rest: {x: -40, y: 16} },
   ];
   [-1, 1].forEach(side => spec.forEach((sp, i) => {
     const g = el("g", {class: "leg"}, host);
@@ -1091,7 +1096,7 @@ function overStage(p) {
 function snapFoot(l, ideal) {
   const narrow = innerWidth <= 640;
   const onStage = narrow ? overStage(visualOf(ideal)) : overStage(ideal);
-  if (!onStage || !meshFrame.length) return narrow ? clampFootTarget(localToWorld(l.rest)) : ideal;
+  if (!onStage || !meshFrame.length) return narrow ? clampFootTarget(restWorld(l)) : ideal;
   const hip = localToWorld(l.hip);
   let best = null, bd = 22;
   for (const p of meshFrame) {
@@ -1176,6 +1181,7 @@ function beginWalk(now, first) {
   seg = {from: {x: PET.x, y: PET.y}, to: dest, t0: now, dur: Math.max(320, dist / speed * 1000)};
   PET.hT = Math.atan2(dest.y - PET.y, dest.x - PET.x);
   PET.walking = true;
+  PET.tuck = 1;
 }
 function petHop() { if (!REDUCED && !holderPaused()) hopUntil = performance.now() + 280; }
 function clampReach(p) {
@@ -1269,27 +1275,119 @@ function clampPaintedInside() {
     minT = Math.max(stage.top + 1, mid - 1);
     maxB = Math.min(stage.bottom - 1, mid + 1);
   }
+  const blocks = hudRects();
+  const speech = speechRect() || (innerWidth <= 640 ? speechLane() : null);
+  if (speech) blocks.push(speech);
+  const run = $("#run");
+  if (run) {
+    const rr = run.getBoundingClientRect();
+    if (rr.width > 2) blocks.push({l: rr.left - 8, t: rr.top - 8, r: rr.right + 8, b: rr.bottom + 8});
+  }
   let dx = 0, dy = 0;
-  if (box.l < minL) dx = minL - box.l;
-  else if (box.r > maxR) dx = maxR - box.r;
-  if (box.t < minT) dy = minT - box.t;
-  else if (box.b > maxB) dy = maxB - box.b;
-  const moved = {l: box.l + dx, r: box.r + dx, t: box.t + dy, b: box.b + dy};
+  const moved = {l: box.l, r: box.r, t: box.t, b: box.b};
+  const applyX = (shift) => {
+    if (moved.l + shift < minL - 0.5 || moved.r + shift > maxR + 0.5) return false;
+    dx += shift; moved.l += shift; moved.r += shift; return true;
+  };
+  const applyY = (shift) => {
+    if (moved.t + shift < minT - 0.5 || moved.b + shift > maxB + 0.5) return false;
+    dy += shift; moved.t += shift; moved.b += shift; return true;
+  };
+  if (moved.l < minL) applyX(minL - moved.l);
+  else if (moved.r > maxR) applyX(maxR - moved.r);
+  if (moved.t < minT) applyY(minT - moved.t);
+  else if (moved.b > maxB) applyY(maxB - moved.b);
+  for (let n = 0; n < 3; n++) {
+    let hit = false;
+    for (const a of blocks) {
+      if (!(moved.r > a.l && moved.l < a.r && moved.b > a.t && moved.t < a.b)) continue;
+      hit = true;
+      const pushR = a.r - moved.l + 2, pushL = moved.r - a.l + 2;
+      const preferRight = (maxR - a.r) >= (a.l - minL);
+      if (!applyX(preferRight ? pushR : -pushL)) applyX(preferRight ? -pushL : pushR);
+      if (!(moved.r > a.l && moved.l < a.r && moved.b > a.t && moved.t < a.b)) continue;
+      const pushD = a.b - moved.t + 2, pushU = moved.b - a.t + 2;
+      const preferDown = (maxB - a.b) >= (a.t - minT);
+      if (!applyY(preferDown ? pushD : -pushU)) applyY(preferDown ? -pushU : pushD);
+    }
+    if (!hit) break;
+  }
+  return {dx, dy};
+}
+function paintedClear() {
+  if (innerWidth > 640) return true;
+  const box = paintedUnion();
+  const stage = $("#stage").getBoundingClientRect();
+  const gap = stageHudGap();
+  if (box.l < stage.left + 0.5 || box.r > stage.right - 0.5) return false;
+  if (box.t < Math.max(stage.top + 1, gap.top) - 0.5 || box.b > Math.min(stage.bottom - 1, gap.bot) + 0.5) return false;
   const blocks = hudRects();
   const speech = speechRect();
   if (speech) blocks.push(speech);
-  for (const a of blocks) {
-    if (!(moved.r > a.l && moved.l < a.r && moved.b > a.t && moved.t < a.b)) continue;
-    const pushR = a.r - moved.l + 2, pushL = moved.r - a.l + 2;
-    const preferRight = (maxR - a.r) >= (a.l - minL);
-    const tryDx = preferRight ? pushR : -pushL;
-    const apply = (shift) => {
-      if (moved.l + shift < minL - 0.5 || moved.r + shift > maxR + 0.5) return false;
-      dx += shift; moved.l += shift; moved.r += shift; return true;
-    };
-    if (!apply(tryDx)) apply(preferRight ? -pushL : pushR);
+  const run = $("#run");
+  if (run) {
+    const rr = run.getBoundingClientRect();
+    if (rr.width > 2) blocks.push({l: rr.left - 4, t: rr.top - 4, r: rr.right + 4, b: rr.bottom + 4});
   }
-  return {dx, dy};
+  return !blocks.some((a) => box.r > a.l && box.l < a.r && box.b > a.t && box.t < a.b);
+}
+function applyClampNudge() {
+  const nudge = clampPaintedInside();
+  if (!(nudge.dx || nudge.dy)) return;
+  PET.x += nudge.dx; PET.y += nudge.dy;
+  if (Math.hypot(nudge.dx, nudge.dy) > 8) plantFeet();
+  else shiftFeet(nudge.dx, nudge.dy);
+  placeHost();
+  syncLegs(performance.now());
+}
+function clearPaintedPark() {
+  if (innerWidth > 640) return;
+  applyClampNudge();
+  if (paintedClear()) return;
+  const b = roamBounds();
+  const spanX = Math.max(0, b.maxX - b.minX);
+  const spanY = Math.max(0, b.maxY - b.minY);
+  const speech = speechRect() || speechLane();
+  const spots = [];
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j < 5; j++) {
+      spots.push({x: b.minX + spanX * (i / 4), y: b.minY + spanY * (j / 4)});
+    }
+  }
+  spots.sort((p, q) => {
+    const score = (s) => {
+      let v = 0;
+      if (speech) {
+        v += Math.hypot(s.x - (speech.l + speech.r) / 2, s.y - (speech.t + speech.b) / 2);
+        if (s.x > speech.r) v += 40;
+      }
+      return v;
+    };
+    return score(q) - score(p);
+  });
+  const saved = {x: PET.x, y: PET.y};
+  for (const s of spots) {
+    PET.x = clamp(s.x, b.minX, b.maxX);
+    PET.y = clamp(s.y, b.minY, b.maxY);
+    plantFeet();
+    placeHost();
+    syncLegs(performance.now());
+    applyClampNudge();
+    if (paintedClear()) return;
+  }
+  PET.x = saved.x; PET.y = saved.y;
+  plantFeet();
+  placeHost();
+  syncLegs(performance.now());
+  applyClampNudge();
+  for (const f of [0.82, 0.68, 0.55, 0.44]) {
+    PET.tuck = f;
+    plantFeet();
+    placeHost();
+    syncLegs(performance.now());
+    applyClampNudge();
+    if (paintedClear()) return;
+  }
 }
 function placeHost() {
   const host = $("#desk-pet");
@@ -1307,14 +1405,14 @@ function syncLegs(now) {
   for (const l of LEGS) {
     if (Math.hypot(l.foot.x - PET.x, l.foot.y - PET.y) > 80) {
       l.stepping = false;
-      l.foot = clampFootTarget(localToWorld(l.rest));
+      l.foot = clampFootTarget(restWorld(l));
     }
     const hip = localToWorld(l.hip);
     if (REDUCED || paused || reacting) {
       l.stepping = false;
-      l.foot = clampFootTarget(localToWorld(l.rest));
+      l.foot = clampFootTarget(restWorld(l));
     } else if (!l.stepping) {
-      const restW = localToWorld(l.rest);
+      const restW = restWorld(l);
       if (PET.walking) {
         const ideal = {x: restW.x + fwd.x * 10, y: restW.y + fwd.y * 10};
         const drift = Math.hypot(l.foot.x - ideal.x, l.foot.y - ideal.y);
@@ -1335,7 +1433,7 @@ function syncLegs(now) {
     if (l.stepping) {
       const u = Math.min(1, (now - l.t0) / l.dur), e = easeIO(u);
       foot = clampFootTarget({x: l.from.x + (l.to.x - l.from.x) * e, y: l.from.y + (l.to.y - l.from.y) * e});
-      if (narrow && !overStage(visualOf(foot))) foot = clampFootTarget(localToWorld(l.rest));
+      if (narrow && !overStage(visualOf(foot))) foot = clampFootTarget(restWorld(l));
       if (u >= 1) {
         l.stepping = false; l.foot = {...foot}; foot = l.foot;
         if (!PET.walking) footRipple(foot);
@@ -1414,7 +1512,6 @@ function renderSpider(now) {
   if (Math.hypot(PET.x - prevX, PET.y - prevY) > 12) plantFeet();
   PET.h += angDiff(PET.h, PET.hT) * Math.min(1, dt * (PET.walking ? 0.016 : 0.005));
   placeHost();
-  $("#pet-facing").setAttribute("transform", `rotate(${(PET.h * 180 / Math.PI).toFixed(2)})`);
   if (!reacting) {
     let bob = 0, hop = 0;
     if (!REDUCED) {
@@ -1430,13 +1527,16 @@ function renderSpider(now) {
   }
   syncLegs(now);
   if (innerWidth <= 640) {
-    const nudge = clampPaintedInside();
-    if (nudge.dx || nudge.dy) {
-      PET.x += nudge.dx; PET.y += nudge.dy;
-      if (Math.hypot(nudge.dx, nudge.dy) > 8) plantFeet();
-      else shiftFeet(nudge.dx, nudge.dy);
-      placeHost();
-      syncLegs(now);
+    if (REDUCED || staticPark) clearPaintedPark();
+    else {
+      const nudge = clampPaintedInside();
+      if (nudge.dx || nudge.dy) {
+        PET.x += nudge.dx; PET.y += nudge.dy;
+        if (Math.hypot(nudge.dx, nudge.dy) > 8) plantFeet();
+        else shiftFeet(nudge.dx, nudge.dy);
+        placeHost();
+        syncLegs(now);
+      }
     }
   }
   if (typeof positionBubble === "function") positionBubble();
@@ -1444,6 +1544,7 @@ function renderSpider(now) {
 }
 function bootSpider() {
   bindSpiderHit();
+  $("#pet-facing").removeAttribute("transform");
   buildLegs();
   plantVisible();
   plantFeet();
@@ -1452,6 +1553,7 @@ function bootSpider() {
   if (REDUCED) {
     renderSpider(now);
     addEventListener("resize", () => {
+      PET.tuck = 1;
       plantVisible();
       plantFeet();
       renderSpider(performance.now());
@@ -1483,18 +1585,12 @@ function positionBubble() {
   top = Math.max(36, Math.min(st.height - bh - foot, top));
   bubble.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px)`;
   if (REDUCED && innerWidth <= 640) {
+    PET.tuck = 1;
     plantVisible();
     plantFeet();
     placeHost();
-    const now = performance.now();
-    syncLegs(now);
-    const nudge = clampPaintedInside();
-    if (nudge.dx || nudge.dy) {
-      PET.x += nudge.dx; PET.y += nudge.dy;
-      plantFeet();
-      placeHost();
-      syncLegs(now);
-    }
+    syncLegs(performance.now());
+    clearPaintedPark();
   } else {
     settleOffChrome();
   }
@@ -1505,7 +1601,7 @@ async function say(text, mood, token) {
   bubble.className = "show" + (mood ? " " + mood : "");
   bubble.innerHTML = `<span class="who">Capsule · paper${mood === "fail" ? " · gate" : ""}</span><span class="txt"></span>`;
   const t = bubble.querySelector(".txt");
-  if (REDUCED) { t.textContent = text; return; }
+  if (REDUCED) { t.textContent = text; positionBubble(); return; }
   for (let i = 1; i <= text.length; i++) {
     if (my !== bubbleType || token !== tourToken) return;
     t.textContent = text.slice(0, i); await sleep(12);
