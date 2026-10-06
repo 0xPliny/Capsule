@@ -299,8 +299,9 @@
     #stage { margin:10px 12px 0; height:clamp(260px, 68vw, 320px); }
     main { padding:12px; }
     .hud.tl, .hud.tr { max-width:46%; }
-    .hud.bl { left:12px; right:12px; }
-    .hud.br { width:auto; max-width:46%; }
+    .hud.bl { left:12px; right:auto; max-width:56%; }
+    .hud.br { width:auto; max-width:40%; }
+    #bubble { max-width:min(240px, 72vw); }
   }
   @media (prefers-reduced-motion: reduce) {
     .pop, .ripple, .foot-ripple, #bubble .txt::after, .typing i, #trail, .edge.route, .holder-strip.is-scanning .chip { animation:none; }
@@ -774,6 +775,8 @@ function avoidRects() {
   push(document.querySelector(".mode-badge"));
   document.querySelectorAll("#stage .hud").forEach(push);
   push($("#holder-chips"));
+  const bub = $("#bubble");
+  if (bub && bub.classList.contains("show")) push(bub);
   return out;
 }
 function inPad(p, r, pad) {
@@ -784,7 +787,7 @@ function hitsAvoid(p, pad) {
 }
 function nudgeOffAvoid(p, b) {
   let x = p.x, y = p.y;
-  const pad = 56;
+  const pad = 70;
   for (const r of avoidRects()) {
     if (!inPad({x, y}, r, pad)) continue;
     const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
@@ -795,6 +798,22 @@ function nudgeOffAvoid(p, b) {
     y = clamp(y, b.minY, b.maxY);
   }
   return {x, y};
+}
+function findClearPlant(b, stage) {
+  const target = {x: stage.left + stage.width * 0.5, y: stage.top + stage.height * (innerWidth <= 430 ? 0.46 : 0.56)};
+  let best = null, bestD = 1e9;
+  for (let fy = 0.36; fy <= 0.64; fy += 0.04) {
+    for (let fx = 0.28; fx <= 0.72; fx += 0.05) {
+      const p = nudgeOffAvoid({
+        x: clamp(stage.left + stage.width * fx, b.minX, b.maxX),
+        y: clamp(stage.top + stage.height * fy, b.minY, b.maxY),
+      }, b);
+      if (hitsAvoid(p, 70)) continue;
+      const d = Math.hypot(p.x - target.x, p.y - target.y);
+      if (d < bestD) { best = p; bestD = d; }
+    }
+  }
+  return best;
 }
 function roamBounds() {
   const header = document.querySelector("header").getBoundingClientRect();
@@ -819,8 +838,11 @@ function plantVisible() {
   const stage = $("#stage").getBoundingClientRect();
   const narrow = innerWidth <= 430;
   const sx = stage.width > 40 ? stage.left + stage.width * (narrow ? 0.50 : REDUCED ? 0.62 : 0.64) : (b.minX + b.maxX) / 2;
-  const sy = stage.height > 40 ? stage.top + stage.height * (narrow ? 0.52 : REDUCED ? 0.55 : 0.58) : b.minY + 36;
-  const planted = nudgeOffAvoid({x: clamp(sx, b.minX, b.maxX), y: clamp(sy, b.minY, b.maxY)}, b);
+  const sy = stage.height > 40 ? stage.top + stage.height * (narrow ? 0.46 : REDUCED ? 0.55 : 0.58) : b.minY + 36;
+  let planted = nudgeOffAvoid({x: clamp(sx, b.minX, b.maxX), y: clamp(sy, b.minY, b.maxY)}, b);
+  if (hitsAvoid(planted, 70) && stage.width > 40) {
+    planted = findClearPlant(b, stage) || planted;
+  }
   PET.x = planted.x;
   PET.y = planted.y;
   PET.h = REDUCED ? -0.4 : 0.25;
@@ -878,18 +900,23 @@ function pickWaypoint(first) {
   const b = roamBounds();
   const accept = (p) => {
     p = nudgeOffAvoid({x: clamp(p.x, b.minX, b.maxX), y: clamp(p.y, b.minY, b.maxY)}, b);
-    if (hitsAvoid(p, 48)) return null;
+    if (hitsAvoid(p, 70)) return null;
     return p;
   };
   if (first) {
-    const ang = Math.random() * Math.PI * 2;
-    const dist = 100 + Math.random() * 36;
-    let dest = {
-      x: clamp(PET.x + Math.cos(ang) * dist, b.minX, b.maxX),
-      y: clamp(PET.y + Math.sin(ang) * dist, b.minY, b.maxY),
-    };
-    if (Math.hypot(dest.x - PET.x, dest.y - PET.y) < 70) dest = {x: clamp(PET.x + 120, b.minX, b.maxX), y: PET.y};
-    return accept(dest) || dest;
+    for (let n = 0; n < 10; n++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = 100 + Math.random() * 36;
+      let dest = {
+        x: clamp(PET.x + Math.cos(ang) * dist, b.minX, b.maxX),
+        y: clamp(PET.y + Math.sin(ang) * dist, b.minY, b.maxY),
+      };
+      if (Math.hypot(dest.x - PET.x, dest.y - PET.y) < 70) dest = {x: clamp(PET.x + 120, b.minX, b.maxX), y: PET.y};
+      const ok = accept(dest);
+      if (ok) return ok;
+    }
+    const stage = $("#stage").getBoundingClientRect();
+    return (stage.width > 40 && findClearPlant(b, stage)) || {x: PET.x, y: PET.y};
   }
   const stage = $("#stage").getBoundingClientRect();
   const main = document.querySelector("main").getBoundingClientRect();
@@ -926,8 +953,9 @@ function pickWaypoint(first) {
     const ok = accept(p);
     if (ok && Math.hypot(ok.x - PET.x, ok.y - PET.y) > 64) return ok;
   }
-  return accept({x: b.minX + Math.random() * (b.maxX - b.minX), y: b.minY + Math.random() * (b.maxY - b.minY)})
-    || {x: b.minX + Math.random() * (b.maxX - b.minX), y: b.minY + Math.random() * (b.maxY - b.minY)};
+  const fallback = accept({x: b.minX + Math.random() * (b.maxX - b.minX), y: b.minY + Math.random() * (b.maxY - b.minY)});
+  if (fallback) return fallback;
+  return (stage.width > 40 && findClearPlant(b, stage)) || {x: clamp(PET.x, b.minX, b.maxX), y: clamp(PET.y, b.minY, b.maxY)};
 }
 function beginWalk(now, first) {
   const dest = pickWaypoint(!!first);
