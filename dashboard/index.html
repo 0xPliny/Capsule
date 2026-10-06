@@ -7,18 +7,19 @@
 <style>
   /* One accent, one border, one radius, two weights. Paper desk — not a live terminal. */
   :root {
-    --bg:#0E1311; --panel:#161C19; --stage:#121816; --line:#3A453F;
-    --text:#E7E4DE; --dim:#8E9791; --accent:#86efac; --ink:#143024;
-    --ok:#86efac; --bad:#E08A82; --warn:#C6B48A;
+    --bg:#0E1311; --panel:#161C19; --stage:#121816; --border:#2A322E; --line:#2A322E;
+    --text:#E8EDE9; --text-dim:#8B968F; --dim:#8B968F; --accent:#86efac; --ink:#0E1311;
+    --ok:#86efac; --bad:#F87171; --warn:#C6B48A;
     --radius:6px; --w:400; --w-strong:600;
+    --edge:#4A5850; --node:#3A4540;
   }
   * { box-sizing:border-box; }
   html, body { background:var(--bg); color:var(--text); }
-  body { margin:0; font:var(--w) 14px/1.45 system-ui,"Segoe UI",sans-serif; }
+  body { margin:0; font:var(--w) 13px/1.45 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace; }
   :focus-visible { outline:1px solid var(--accent); outline-offset:2px; }
-  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; padding:12px 22px;
-           background:var(--bg); border-bottom:1px solid var(--line); flex-wrap:wrap; }
-  .logo { width:28px; height:28px; display:block; flex:0 0 auto; }
+  header { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:12px; padding:12px 22px;
+           background:var(--bg); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+  .logo { width:22px; height:22px; display:block; flex:0 0 auto; }
   .brand { min-width:0; }
   h1 { font-size:16px; margin:0; font-weight:var(--w-strong); letter-spacing:0; color:var(--text); }
   .sub { margin:1px 0 0; color:var(--dim); font-size:12px; font-weight:var(--w); }
@@ -32,16 +33,16 @@
   .status-pill.is-bad { color:var(--bad); border-color:var(--bad); }
   .spacer { flex:1; }
   button#run { background:var(--accent); color:var(--ink); border:1px solid var(--accent); padding:8px 14px;
-               border-radius:var(--radius); font:var(--w-strong) 13px/1 system-ui,"Segoe UI",sans-serif; cursor:pointer; }
+               border-radius:var(--radius); font:var(--w-strong) 13px/1 ui-monospace,Menlo,Consolas,monospace; cursor:pointer; }
   button#run:hover { background:#9af6bb; }
   button#run:disabled { opacity:.55; cursor:wait; }
   #status { color:var(--dim); font-size:12px; }
 
   #stage { position:relative; height:clamp(340px, 36vw, 440px); margin:16px 22px 0; border-radius:var(--radius); overflow:hidden;
-           border:1px solid var(--line); background:var(--stage); }
+           border:1px solid var(--border); background:var(--stage); }
   #stage::before { content:""; position:absolute; inset:0; pointer-events:none;
-           background-image:linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
-           background-size:48px 48px; opacity:.45; }
+           background-image:linear-gradient(var(--edge) 1px, transparent 1px), linear-gradient(90deg, var(--edge) 1px, transparent 1px);
+           background-size:48px 48px; opacity:.55; }
   #dust, #web { position:absolute; inset:0; width:100%; height:100%; display:block; }
   .hud { position:absolute; z-index:3; font-size:12px; font-weight:var(--w); color:var(--dim); pointer-events:none; }
   .hud.tl { top:12px; left:14px; } .hud.tr { top:12px; right:14px; text-align:right; }
@@ -57,29 +58,34 @@
   .swatch.node { width:7px; height:7px; border-radius:var(--radius); background:var(--dim); }
   .swatch.pass { background:var(--accent); } .swatch.fail { background:var(--bad); } .swatch.path { background:var(--accent); }
 
-  #web text { font-family:system-ui,"Segoe UI",sans-serif; }
-  .medge { stroke:var(--line); stroke-width:1; opacity:1; }
-  .mnode { fill:var(--dim); opacity:.4; }
-  .edge { stroke:var(--line); stroke-width:1.25; opacity:1; transition:stroke .3s, stroke-width .3s; }
-  .edge.lit { stroke:var(--accent); stroke-width:1.75; }
-  #trail { fill:none; stroke:var(--accent); stroke-width:1.5; stroke-linejoin:round; opacity:.8; }
-  .gstrand { stroke:var(--line); stroke-width:1.5; opacity:1; transition:stroke .3s, stroke-width .3s, transform .35s, opacity .4s; transform-box:view-box; }
-  .gstrand.pass { stroke:var(--accent); stroke-width:2; }
+  #web text { font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace; }
+  .medge { stroke:var(--edge); stroke-width:1.25; opacity:1; }
+  .mnode { fill:var(--node); opacity:.95; }
+  .edge { stroke:var(--edge); stroke-width:1.5; opacity:1; transition:stroke .3s, stroke-width .3s; }
+  .edge.route { stroke:var(--accent); stroke-width:2.25; stroke-dasharray:8 6; animation:pathflow 1.5s linear infinite; }
+  .edge.lit { stroke:var(--accent); stroke-width:2.5; filter:drop-shadow(0 0 4px rgba(134,239,172,.55)); }
+  #trail { fill:none; stroke:var(--accent); stroke-width:2.25; stroke-linejoin:round; stroke-dasharray:8 6; opacity:.95; animation:pathflow 1.5s linear infinite; }
+  @keyframes pathflow { to { stroke-dashoffset:-28; } }
+  .gstrand { stroke:var(--edge); stroke-width:1.5; opacity:1; transition:stroke .3s, stroke-width .3s, transform .35s, opacity .4s; transform-box:view-box; }
+  .gstrand.pass { stroke:var(--accent); stroke-width:2.25; }
   .gstrand.fail { stroke:var(--bad); stroke-width:2; }
 
-  .node .dotn { fill:var(--dim); }
+  .node .dotn { fill:var(--node); }
   .node.visit .dotn { fill:var(--accent); }
   .node .ringn { fill:none; stroke:var(--bad); stroke-width:1.25; opacity:0; }
   .node.fail .ringn, .node.act.bad .ringn { opacity:1; }
-  .node .lead { stroke:var(--line); stroke-width:1; opacity:1; }
-  .node .box { fill:var(--panel); stroke:var(--line); stroke-width:1; }
+  .node .selring { fill:none; stroke:var(--accent); stroke-width:2; opacity:0; }
+  .node.visit .selring { opacity:1; filter:drop-shadow(0 0 6px rgba(134,239,172,.55)); }
+  .node.visit .k, .node.visit .v, .node.visit .card-name { font-weight:600; }
+  .node .lead { stroke:var(--edge); stroke-width:1.25; opacity:1; }
+  .node .box { fill:var(--panel); stroke:var(--edge); stroke-width:1; }
   .node.visit .box, .node.visit .card-bg { stroke:var(--accent); }
   .node.pass .box { stroke:var(--accent); } .node.fail .box { stroke:var(--bad); }
   .node .k { fill:var(--dim); font-size:10px; font-weight:var(--w-strong); letter-spacing:.04em; }
   .node.visit .k { fill:var(--accent); }
   .node .v { fill:var(--text); font-size:13px; font-weight:var(--w-strong); }
   .node.pass .v { fill:var(--accent); } .node.fail .v, .node.err .v { fill:var(--bad); }
-  .card-bg { fill:var(--panel); stroke:var(--line); stroke-width:1; }
+  .card-bg { fill:var(--panel); stroke:var(--edge); stroke-width:1; }
   .card-name { fill:var(--text); font-size:15px; font-weight:var(--w-strong); }
   .card-at { fill:var(--dim); font-size:12px; font-weight:var(--w); }
   .card-line { fill:var(--text); font-size:12px; font-weight:var(--w); }
@@ -95,33 +101,19 @@
   .ripple { fill:none; stroke-width:1.25; transform-box:fill-box; transform-origin:center; animation:ripple .8s ease-out forwards; }
   @keyframes ripple { from { transform:scale(.4); opacity:.7; } to { transform:scale(1); opacity:0; } }
 
-  /* Pip: white/mint capsule plush. Flat fills, no halo spam. Not Pump IP. */
-  .m-shadow { fill:url(#mShadow); }
-  .m-ring { fill:none; stroke:var(--accent); stroke-width:1; opacity:.2; }
-  .m-halo { fill:url(#mHalo); opacity:.22; }
-  .m-body { filter:none; }
-  .m-cap-bot { fill:#86efac; stroke:#6fde9c; stroke-width:1.25; }
-  .m-cap-top { fill:#f7faf8; stroke:#dfe8e3; stroke-width:1.25; }
-  .m-rim { fill:url(#mRim); }
-  .m-bot-hi { fill:#ffffff; opacity:.18; }
-  .m-seam { stroke:#f4faf7; stroke-width:1.25; opacity:.9; }
-  .m-seam2 { stroke:#5dca8e; stroke-width:1; opacity:.45; }
-  .m-shine { fill:#fff; opacity:.7; }
-  .m-shine2 { fill:#fff; opacity:.28; }
-  .m-limb { fill:#86efac; stroke:#6fde9c; stroke-width:1.25; }
-  .m-limb.back { fill:#74e0a0; stroke:#62c98c; }
-  .m-limb-hi { fill:#fff; opacity:.4; }
-  .m-eye { fill:#14181a; }
-  .m-glint { fill:#fff; }
-  .m-blush { fill:#e7b3c2; opacity:.45; }
-  .m-smile { fill:none; stroke:#14181a; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
-  .m-mouth-open { fill:#3a2228; stroke:#14181a; stroke-width:1; stroke-linejoin:round; }
-  .m-tongue { fill:#e7b3c2; }
-  .m-spark { display:none; }
+  /* Capsule spider — white shell, one mint accent. Decorative; never takes clicks. */
+  #desk-pet { position:fixed; z-index:6; left:50%; top:38%; width:0; height:0; overflow:visible; pointer-events:none; }
+  #pet-svg { position:absolute; left:-70px; top:-70px; overflow:visible; display:block; }
+  #pet-legs .leg-line { fill:none; stroke:#86efac; stroke-width:2.25; stroke-linecap:round; stroke-linejoin:round;
+                        filter:drop-shadow(0 0 8px rgba(134,239,172,.55)); }
+  #pet-legs .jnt, #pet-legs .tip { fill:#86efac; }
+  #spider-body { filter:drop-shadow(0 0 6px rgba(134,239,172,.45)); }
+  .foot-ripple { fill:none; stroke:#86efac; stroke-width:1.5; transform-box:fill-box; transform-origin:center; animation:footrip .6s ease-out forwards; }
+  @keyframes footrip { from { transform:scale(.35); opacity:.7; } to { transform:scale(1.6); opacity:0; } }
 
   #bubble { position:absolute; z-index:4; left:0; top:0; max-width:320px; padding:8px 10px; border-radius:var(--radius);
-            background:var(--panel); color:var(--text); border:1px solid var(--line);
-            font:var(--w) 13px/1.4 system-ui,"Segoe UI",sans-serif; opacity:0; transition:opacity .2s; pointer-events:none; }
+            background:var(--panel); color:var(--text); border:1px solid var(--border);
+            font:var(--w) 13px/1.4 ui-monospace,Menlo,Consolas,monospace; opacity:0; transition:opacity .2s; pointer-events:none; }
   #bubble.show { opacity:1; }
   #bubble .who { display:block; font-size:11px; font-weight:var(--w-strong); color:var(--dim); letter-spacing:.03em; margin-bottom:2px; }
   #bubble .txt::after { content:"▌"; color:var(--accent); animation:caret .8s steps(1) infinite; margin-left:1px; }
@@ -133,8 +125,8 @@
   @keyframes typ { 30% { opacity:1; } }
 
   main { padding:16px 22px 28px; display:grid; gap:14px; grid-template-columns:repeat(12, 1fr); }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; min-width:0; }
-  .card h2 { margin:0 0 12px; font-size:12px; font-weight:var(--w-strong); color:var(--dim); letter-spacing:.04em; text-transform:uppercase; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; min-width:0; }
+  .card h2 { margin:0 0 12px; font-size:12px; font-weight:600; color:var(--dim); letter-spacing:.04em; text-transform:uppercase; }
   .c4 { grid-column:span 4; } .c12 { grid-column:span 12; }
   @media (max-width:1000px) { .c4 { grid-column:span 12; } }
   .kv { display:grid; grid-template-columns:100px 1fr; gap:6px 10px; }
@@ -152,7 +144,7 @@
   .gate-copy { min-width:0; }
   .gate-name { color:var(--text); font-weight:var(--w); }
   .gate-reason { color:var(--dim); font-size:12px; font-weight:var(--w); white-space:normal; margin-top:2px; }
-  .gate-mark { font-weight:var(--w-strong); font-size:12px; letter-spacing:.04em; padding:3px 8px; border-radius:var(--radius); border:1px solid var(--line); flex:0 0 auto; }
+  .gate-mark { font-weight:600; font-size:12px; letter-spacing:.04em; padding:3px 8px; border-radius:var(--radius); border:1px solid var(--border); flex:0 0 auto; min-width:52px; text-align:center; }
   .insuff { border:1px solid var(--bad); border-radius:var(--radius); padding:8px 10px; margin:0 0 10px; color:var(--text); }
   .insuff strong { color:var(--bad); font-weight:var(--w-strong); }
   .ev-note { margin:-4px 0 12px; font-size:12px; }
@@ -170,7 +162,7 @@
   a.mint-link:hover, a.mint-link:focus-visible { color:var(--text); }
   a.mint-link .ext { font-size:.85em; margin-left:3px; color:var(--dim); text-decoration:none; }
   .hud a.mint-link { pointer-events:auto; }
-  #mascot, #fx, #trail, #gstrands, #mesh { pointer-events:none; }
+  #fx, #trail, #gstrands, #mesh, #desk-pet, #desk-pet * { pointer-events:none; }
   #web a.svg-mint { cursor:pointer; }
   #web a.svg-mint .card-mint { fill:var(--accent); font-size:11px; font-weight:var(--w-strong); text-decoration:underline; }
   #web a.svg-mint:hover .card-mint, #web a.svg-mint:focus .card-mint { fill:var(--text); }
@@ -178,38 +170,30 @@
   a.hdr-link { color:var(--text); text-decoration:none; font-weight:var(--w-strong); font-size:13px;
                padding:6px 10px; border:1px solid var(--line); border-radius:var(--radius); }
   a.hdr-link:hover { color:var(--accent); border-color:var(--accent); }
-  @media (prefers-reduced-motion: reduce) { .pop, .ripple, #bubble .txt::after, .typing i { animation:none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .pop, .ripple, .foot-ripple, #bubble .txt::after, .typing i, #trail, .edge.route { animation:none; }
+  }
 </style>
 </head>
-<body>
+<body data-holder-risk="ok">
 <header>
-  <svg class="logo" viewBox="0 0 30 30" aria-hidden="true">
-    <g>
-    <path d="M8,15 L8,9.5 A7,7 0 0 1 22,9.5 L22,15 Z" fill="#f7faf8" stroke="#dfe8e3" stroke-width=".7"/>
-    <path d="M8,15 L8,20.5 A7,7 0 0 0 22,20.5 L22,15 Z" fill="#86efac" stroke="#6fde9c" stroke-width=".7"/>
+  <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+    <g fill="none" stroke="#86efac" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9.2 10.6 L4.2 6.2 M8.6 12.2 L3.4 12.2 M9.2 13.8 L4.4 18 M10 15.2 L7.2 20.2"/>
+      <path d="M15.4 10.4 L20.2 6.2 M16 12.2 L21 12.2 M15.6 13.8 L20 18 M14.6 15.2 L17.6 20.2"/>
     </g>
-    <line x1="8.5" y1="15" x2="21.5" y2="15" stroke="#d9fff1" stroke-width=".6"/>
-    <ellipse cx="11" cy="6.6" rx="2.2" ry="1.2" fill="#fff" transform="rotate(-25 11 6.6)"/>
-    <!-- face -->
-    <ellipse cx="12.2" cy="11.2" rx="1.8" ry="2.4" fill="#12121c"/>
-    <ellipse cx="17.8" cy="11.2" rx="1.8" ry="2.4" fill="#12121c"/>
-    <circle cx="11.6" cy="10.3" r=".6" fill="#fff"/><circle cx="12.7" cy="12.1" r=".3" fill="#fff"/>
-    <circle cx="17.2" cy="10.3" r=".6" fill="#fff"/><circle cx="18.3" cy="12.1" r=".3" fill="#fff"/>
-    <ellipse cx="11.6" cy="14" rx="1.5" ry=".8" fill="#ff6f9f" opacity=".9"/>
-    <ellipse cx="18.4" cy="14" rx="1.5" ry=".8" fill="#ff6f9f" opacity=".9"/>
-    <path d="M13.2,13.6 Q15,15.2 16.8,13.6" fill="none" stroke="#12121c" stroke-width=".85" stroke-linecap="round"/>
-    <!-- stubby limbs -->
-    <ellipse cx="6.2" cy="15.2" rx="2.2" ry="1.5" fill="#4ff0bb" stroke="#0fa577" stroke-width=".6"/>
-    <ellipse cx="23.8" cy="15.2" rx="2.2" ry="1.5" fill="#4ff0bb" stroke="#0fa577" stroke-width=".6"/>
-    <ellipse cx="12.2" cy="27" rx="2" ry="1.6" fill="#4ff0bb" stroke="#0fa577" stroke-width=".6"/>
-    <ellipse cx="17.8" cy="27" rx="2" ry="1.6" fill="#4ff0bb" stroke="#0fa577" stroke-width=".6"/>
+    <ellipse cx="10.4" cy="13.4" rx="4.3" ry="4.7" fill="#FFFFFF"/>
+    <ellipse cx="10.4" cy="15.4" rx="2.8" ry="1.5" fill="#86efac"/>
+    <ellipse cx="15.5" cy="12.1" rx="2.9" ry="2.5" fill="#FFFFFF"/>
+    <circle cx="16.4" cy="11.4" r=".75" fill="#0E1311"/>
+    <circle cx="16.4" cy="13" r=".75" fill="#0E1311"/>
   </svg>
   <div class="brand">
     <h1>Capsule</h1>
     <p class="sub">$CAPS · paper desk</p>
   </div>
   <p class="mode-badge" role="status">DRY RUN · PAPER</p>
-  <p class="affil">Not affiliated with Pump · <a href="https://x.com/0xPliny" target="_blank" rel="noopener noreferrer">tips</a></p>
+  <p class="affil">Not affiliated with pump.fun · <a href="https://x.com/0xPliny" target="_blank" rel="noopener noreferrer">Tips</a></p>
   <span class="spacer"></span>
   <span id="live-badge" class="status-pill">orders off</span>
   <a class="hdr-link" href="https://x.com/0xPliny" target="_blank" rel="noopener noreferrer" title="Tips on X">Tips</a>
@@ -219,49 +203,41 @@
   <button id="run" type="button">Run dry-run</button>
 </header>
 
-<section id="stage" aria-label="Capsule mascot touring the latest dry-run decision graph">
+<div id="desk-pet" data-holder-risk="ok" aria-hidden="true">
+  <svg id="pet-svg" viewBox="-70 -70 140 140" width="140" height="140">
+    <g id="pet-fx"></g>
+    <g id="pet-facing">
+      <g id="pet-legs"></g>
+      <g id="pet-bob">
+        <g id="spider-body">
+          <ellipse id="pet-abd" cx="-18" cy="2" rx="24" ry="36" fill="#FFFFFF" stroke="#86efac" stroke-width="1.75"/>
+          <ellipse cx="-18" cy="18" rx="18" ry="12" fill="#86efac"/>
+          <ellipse cx="4" cy="1" rx="5" ry="4.2" fill="#86efac"/>
+          <ellipse cx="20" cy="-1" rx="17" ry="15" fill="#FFFFFF" stroke="#86efac" stroke-width="1.75"/>
+          <g id="pet-eyes">
+            <ellipse cx="28" cy="-6.2" rx="5.6" ry="6.6" fill="#FFFFFF" stroke="#0E1311" stroke-width="1.6"/>
+            <ellipse cx="28" cy="5.6" rx="5.6" ry="6.6" fill="#FFFFFF" stroke="#0E1311" stroke-width="1.6"/>
+            <circle cx="30.4" cy="-6.2" r="2.8" fill="#0E1311"/>
+            <circle cx="30.4" cy="5.6" r="2.8" fill="#0E1311"/>
+            <circle cx="29.2" cy="-8" r="1.15" fill="#FFFFFF"/>
+            <circle cx="29.2" cy="3.8" r="1.15" fill="#FFFFFF"/>
+          </g>
+          <path d="M24,9.4 Q28.2,13.2 32.6,9.4" fill="none" stroke="#0E1311" stroke-width="1.35" stroke-linecap="round"/>
+        </g>
+      </g>
+    </g>
+  </svg>
+</div>
+
+<section id="stage" aria-label="Dry-run decision graph">
   <canvas id="dust"></canvas>
   <svg id="web" viewBox="0 0 1200 540" preserveAspectRatio="xMidYMid meet">
-    <defs>
-      <linearGradient id="mCapTop" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#ffffff"/><stop offset="1" stop-color="#eefcf6"/>
-      </linearGradient>
-      <linearGradient id="mCapBot" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#9dffdc"/><stop offset=".35" stop-color="#4ff0bb"/><stop offset=".8" stop-color="#1fd196"/><stop offset="1" stop-color="#14b884"/>
-      </linearGradient>
-      <radialGradient id="mBotHi" cx=".32" cy=".25" r=".6">
-        <stop offset="0" stop-color="#ffffff" stop-opacity=".7"/><stop offset=".5" stop-color="#ffffff" stop-opacity=".12"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-      </radialGradient>
-      <linearGradient id="mRim" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0" stop-color="#ffffff" stop-opacity=".25"/><stop offset=".22" stop-color="#ffffff" stop-opacity="0"/>
-        <stop offset=".74" stop-color="#0fbf8a" stop-opacity="0"/><stop offset="1" stop-color="#0fbf8a" stop-opacity=".22"/>
-      </linearGradient>
-      <linearGradient id="mLimb" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#8affd8"/><stop offset="1" stop-color="#1fcf95"/>
-      </linearGradient>
-      <linearGradient id="mLimbBack" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#4fe8b7"/><stop offset="1" stop-color="#14ab7c"/>
-      </linearGradient>
-      <radialGradient id="mEye" cx=".38" cy=".3" r=".75">
-        <stop offset="0" stop-color="#3d4260"/><stop offset=".55" stop-color="#12121c"/><stop offset="1" stop-color="#050508"/>
-      </radialGradient>
-      <radialGradient id="mBlush" cx=".5" cy=".5" r=".5">
-        <stop offset="0" stop-color="#ff5f97" stop-opacity=".95"/><stop offset=".6" stop-color="#ff7aa8" stop-opacity=".6"/><stop offset="1" stop-color="#ff9ec0" stop-opacity="0"/>
-      </radialGradient>
-      <radialGradient id="mHalo" cx=".5" cy=".5" r=".5">
-        <stop offset="0" stop-color="#4dffc4" stop-opacity=".38"/><stop offset=".55" stop-color="#4dffc4" stop-opacity=".12"/><stop offset="1" stop-color="#4dffc4" stop-opacity="0"/>
-      </radialGradient>
-      <radialGradient id="mShadow" cx=".5" cy=".5" r=".5">
-        <stop offset="0" stop-color="#000" stop-opacity=".7"/><stop offset=".6" stop-color="#03261c" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
     <g id="mesh"></g>
     <g id="edges"></g>
     <g id="gstrands"></g>
     <path id="trail" d=""/>
     <g id="nodes"></g>
     <g id="fx"></g>
-    <g id="mascot"></g>
   </svg>
   <div class="hud tl"><div class="title">Paper desk</div><div id="hud-coin">mapping …</div></div>
   <div class="hud tr"><div id="hud-step">step – / –</div><div id="prog"><i></i></div></div>
@@ -371,6 +347,8 @@ function renderPanels(row) {
   }
   const s = row.snapshot || {}, c = s.coin || {}, j = row.judgment || {}, d = rowIntent(row);
   const live = !!row.live_order;
+  const riskRaw = String((row.holder_risk || (row.judgment && row.judgment.holder_risk) || "ok")).toLowerCase();
+  document.body.dataset.holderRisk = (riskRaw === "risky" || riskRaw === "danger") ? riskRaw : "ok";
   const lb = $("#live-badge"); lb.textContent = live ? "live_order true" : "orders off"; lb.className = "status-pill" + (live ? " is-bad" : "");
   $("#hud-live").textContent = String(live); $("#hud-live").style.color = live ? "var(--bad)" : "var(--dim)";
   $("#coin").innerHTML = `
@@ -505,142 +483,288 @@ function drawMesh() {
 
 function drawEdges() {
   const g = $("#edges"); g.innerHTML = ""; EDGE = {};
-  ROUTE_EDGES.concat(CROSS_EDGES).forEach(([a, b]) => {
+  const add = (pairs, cls) => pairs.forEach(([a, b]) => {
     const p = POS[a], q = POS[b];
-    EDGE[ek(a, b)] = el("line", {x1:p.x, y1:p.y, x2:q.x, y2:q.y, class:"edge"}, g);
+    EDGE[ek(a, b)] = el("line", {x1:p.x, y1:p.y, x2:q.x, y2:q.y, class:cls}, g);
   });
+  add(ROUTE_EDGES, "edge route");
+  add(CROSS_EDGES, "edge");
 }
 
-// ------------------------------------------------------------- mascot: "Pip" — original capsule desk agent
-// Bright white/mint medicinal-capsule plush (vertical pill).
-// Original artwork for the desk — not an official pump.fun asset / no IP claim.
-// Hops along graph edges with big squash & stretch + arm/leg swing; idles with bob, wiggle, head tilt,
-// (double) blinks, little hops, waves and twinkles. Reacts to gates: happy jump on PASS, shiver on FAIL.
-// prefers-reduced-motion: no hops/wiggle/sparkle motion — only expression changes + blink.
-const SP = { x: -170, y: POS.coin.y, at: null, walking: false, h: 0, hT: 0 };
+// ------------------------------------------------------------- capsule spider: 8-leg desk pet
+// White cephalothorax + abdomen, mint legs, friendly eyes. Roams the viewport below the header.
+// 2-bone IK (hip→knee→foot), alternating groups of 4. prefers-reduced-motion: planted, no roam.
+const PET = { x: 0, y: 0, h: 0.2, hT: 0.2, walking: false };
+const L1 = 16, L2 = 18, REACH = L1 + L2;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const angDiff = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
-const M = { face: 1, nextHop: 0, hopT0: -1e9, nextBlink: 0, blinkT0: -1e9, dbl: false, look: 0, lookT: 0, nextLook: 0,
-            wasWalking: false, landT0: -1e9, nextWave: 4000, waveT0: -1e9, react: null };
-let MG = {};
-const CAPSULE = "M-20,-42 L-20,-62 A20,20 0 0 1 20,-62 L20,-22 A20,20 0 0 1 -20,-22 Z";
-const STAR = "M0,-5 L1.1,-1.1 L5,0 L1.1,1.1 L0,5 L-1.1,1.1 L-5,0 L-1.1,-1.1 Z";
+const easeIO = (u) => u * u * (3 - 2 * u);
+let LEGS = [], seg = null, restUntil = 0, hopUntil = 0, walkArmed = false, meshFrame = [];
+let nextBlink = 0, blinkT0 = -1e9, nextShuffle = 0;
 
-function buildMascot() {
-  const root = $("#mascot"); root.innerHTML = "";
-  MG.root = root;
-  MG.shadow = el("ellipse", {cx:0, cy:3, rx:27, ry:7.5, class:"m-shadow"}, root);
-  MG.ring = el("ellipse", {cx:0, cy:3, rx:31, ry:9, class:"m-ring"}, root);
-  MG.flip = el("g", {}, root);
-  MG.hop = el("g", {}, MG.flip);
-  MG.halo = el("ellipse", {cx:0, cy:-42, rx:54, ry:60, class:"m-halo"}, MG.hop);   // soft mint aura
-  MG.lean = el("g", {}, MG.hop);                     // whole-body lean / wiggle / tilt, pivot at the feet
-  // stubby mint legs (back first)
-  const leg = (x, back) => { const g = el("g", {}, MG.lean);
-    el("ellipse", {cx:x, cy:1.5, rx:7.8, ry:5.6, class:"m-limb" + (back ? " back" : "")}, g);
-    if (!back) el("ellipse", {cx:x - 2.4, cy:-0.6, rx:2.6, ry:1.3, class:"m-limb-hi"}, g);
-    return g; };
-  MG.legB = leg(-10, true); MG.legF = leg(10, false);
-  MG.sq = el("g", {}, MG.lean);                       // squash & stretch around the feet
-  // stubby mint arms at the white/mint seam (y≈-42)
-  const arm = (x, back) => { const g = el("g", {}, MG.sq);
-    el("ellipse", {cx:x, cy:-41, rx:8.6, ry:5.8, class:"m-limb" + (back ? " back" : "")}, g);
-    if (!back) el("ellipse", {cx:x - 1.5, cy:-43.3, rx:3, ry:1.4, class:"m-limb-hi"}, g);
-    return g; };
-  MG.armB = arm(-27, true);
-  // capsule body: vertical pill, crisp white top / bright mint bottom, seam at y=-42
-  // geometry: top hemisphere center (0,-62) r=20 → top y=-82; bottom center (0,-22) r=20 → bottom y=-2
-  MG.body = el("g", {class:"m-body"}, MG.sq);
-  el("path", {d:"M-20,-42 L-20,-22 A20,20 0 0 0 20,-22 L20,-42 Z", class:"m-cap-bot"}, MG.body);
-  el("path", {d:"M-20,-42 L-20,-62 A20,20 0 0 1 20,-62 L20,-42 Z", class:"m-cap-top"}, MG.body);
-  el("path", {d:CAPSULE, class:"m-rim"}, MG.sq);                                       // side rim light / shade
-  el("path", {d:"M-19,-41 L-19,-22 A19,19 0 0 0 19,-22 L19,-41 Z", class:"m-bot-hi"}, MG.sq); // glossy mint highlight
-  el("line", {x1:-19, y1:-42.6, x2:19, y2:-42.6, class:"m-seam"}, MG.sq);
-  el("line", {x1:-19, y1:-41, x2:19, y2:-41, class:"m-seam2"}, MG.sq);
-  // plush shine
-  el("ellipse", {cx:-9, cy:-71, rx:7.5, ry:4.2, transform:"rotate(-28 -9 -71)", class:"m-shine"}, MG.sq);
-  el("circle", {cx:-1, cy:-77.6, r:1.6, class:"m-shine"}, MG.sq);
-  el("ellipse", {cx:-13.5, cy:-27, rx:2.3, ry:7, transform:"rotate(12 -13.5 -27)", class:"m-shine2"}, MG.sq);
-  // face on white half: glossy oval eyes w/ double sparkle, soft pink blush, smile / open grin / "o"
-  MG.face = el("g", {}, MG.sq);
-  MG.blush = [-12, 12].map(x => el("ellipse", {cx:x, cy:-49.2, rx:6.4, ry:3.8, class:"m-blush"}, MG.face));
-  MG.eyes = el("g", {}, MG.face);
-  MG.pupils = [];
-  [[-8.5, -58], [8.5, -58]].forEach(([x, y]) => {
-    el("ellipse", {cx:x, cy:y, rx:5.6, ry:7.6, class:"m-eye"}, MG.eyes);
-    const pg = el("g", {}, MG.eyes);
-    el("circle", {cx:x - 1.7, cy:y - 2.7, r:2.1, class:"m-glint"}, pg);
-    el("circle", {cx:x + 1.9, cy:y + 2.7, r:1, class:"m-glint"}, pg);
-    MG.pupils.push(pg);
-  });
-  MG.smile = el("path", {d:"M-5.5,-47.6 Q0,-43 5.5,-47.6", class:"m-smile"}, MG.face);
-  MG.grin = el("g", {opacity:0}, MG.face);
-  el("path", {d:"M-5.6,-48.4 Q0,-49.2 5.6,-48.4 Q4.6,-42.2 0,-41.9 Q-4.6,-42.2 -5.6,-48.4 Z", class:"m-mouth-open"}, MG.grin);
-  el("ellipse", {cx:0, cy:-43.4, rx:2.9, ry:1.4, class:"m-tongue"}, MG.grin);
-  MG.oh = el("ellipse", {cx:0, cy:-45.4, rx:2.2, ry:2.7, class:"m-mouth-open", opacity:0}, MG.face);
-  MG.armF = arm(27, false);
-  // twinkle sparkles around Pip (not mirrored with facing)
-  MG.sparks = [[-38, -80, 0], [35, -92, 1.7], [42, -42, 3.1], [-42, -30, 4.4], [3, -106, 5.6]].map(([x, y, ph]) =>
-    ({x, y, ph, e: el("path", {d:STAR, class:"m-spark", opacity:0}, root)}));
+function holderPaused() {
+  const v = String(document.body.dataset.holderRisk || "ok").toUpperCase();
+  return v === "RISKY" || v === "DANGER";
 }
-
-function mascotReact(kind) { M.react = {kind, t0: performance.now(), dur: kind === "fail" ? 700 : 950}; }
-
-let lastFrame = performance.now();
-function renderMascot(now) {
-  const dt = Math.min(50, now - lastFrame); lastFrame = now;
-  // face travel direction: smooth scaleX through 0 reads as a quick turn
-  const want = Math.cos(SP.hT) < -0.08 ? -1 : Math.cos(SP.hT) > 0.08 ? 1 : M.face >= 0 ? 1 : -1;
-  M.face += (want - M.face) * Math.min(1, dt * 0.018);
-  let hopY = 0, sx = 1, sy = 1, legF = 0, legB = 0, armF = 0, armB = 0, ground = 1, lean = 0, tilt = 0, shakeX = 0;
-  let mouth = 0 /* 0 smile · 1 grin · 2 "o" */, spark = 0, blushK = 1;
-  const R = M.react, ru = R ? (now - R.t0) / R.dur : 9;
-  if (R && ru >= 1) M.react = null;
-  // Calm rest: the tour still walks the graph. The body only breathes, and flinches once on a failed gate.
-  if (!REDUCED) {
-    const br = Math.sin(now / 1100);
-    sy = 1 + 0.012 * br; sx = 1 - 0.008 * br; hopY = -0.4 * br;
-    if (SP.walking) lean = 2;
-    if (R && ru < 1) {
-      if (R.kind === "pass") mouth = 1;
-      else { shakeX = Math.sin(ru * Math.PI * 6) * 1.4 * (1 - ru); mouth = 2; }
+function roamBounds() {
+  const header = document.querySelector("header").getBoundingClientRect();
+  const inset = 12, half = 55;
+  const minY = Math.max(header.bottom + 8, inset) + half;
+  const maxY = Math.max(minY + 48, innerHeight - inset - half);
+  const minX = inset + half;
+  const maxX = Math.max(minX + 48, innerWidth - inset - half);
+  return { minX, maxX, minY, maxY };
+}
+function localToWorld(p) {
+  const c = Math.cos(PET.h), s = Math.sin(PET.h);
+  return { x: PET.x + p.x * c - p.y * s, y: PET.y + p.x * s + p.y * c };
+}
+function worldToLocal(p) {
+  const c = Math.cos(PET.h), s = Math.sin(PET.h);
+  const dx = p.x - PET.x, dy = p.y - PET.y;
+  return { x: dx * c + dy * s, y: -dx * s + dy * c };
+}
+function plantVisible() {
+  const b = roamBounds();
+  const stage = $("#stage").getBoundingClientRect();
+  const sx = stage.width > 40 ? stage.left + stage.width * (REDUCED ? 0.62 : 0.64) : (b.minX + b.maxX) / 2;
+  const sy = stage.height > 40 ? stage.top + stage.height * (REDUCED ? 0.55 : 0.58) : b.minY + 36;
+  PET.x = clamp(sx, b.minX, b.maxX);
+  PET.y = clamp(sy, b.minY, b.maxY);
+  PET.h = REDUCED ? -0.4 : 0.25;
+  PET.hT = PET.h;
+  PET.walking = false;
+}
+function buildLegs() {
+  const host = $("#pet-legs"); host.innerHTML = "";
+  LEGS = [];
+  const spec = [
+    { hip: {x: 26, y: 12}, rest: {x: 47, y: 18} },
+    { hip: {x: 6, y: 18}, rest: {x: 14, y: 50} },
+    { hip: {x: -16, y: 22}, rest: {x: -12, y: 50} },
+    { hip: {x: -30, y: 12}, rest: {x: -47, y: 16} },
+  ];
+  [-1, 1].forEach(side => spec.forEach((sp, i) => {
+    const g = el("g", {class: "leg"}, host);
+    const hip = {x: sp.hip.x, y: sp.hip.y * side};
+    const rest = {x: sp.rest.x, y: sp.rest.y * side};
+    LEGS.push({
+      side, i, group: (i + (side > 0 ? 1 : 0)) % 2, hip, rest,
+      line: el("polyline", {class: "leg-line"}, g),
+      kd: el("circle", {r: 2.4, class: "jnt"}, g),
+      fd: el("circle", {r: 2.6, class: "tip"}, g),
+      foot: {x: 0, y: 0}, from: null, to: null, t0: 0, dur: 150, stepping: false, nextIdle: 0,
+    });
+  }));
+}
+function refreshMesh() {
+  const svg = $("#web"), ctm = svg && svg.getScreenCTM();
+  if (!ctm) { meshFrame = []; return; }
+  meshFrame = MESH.concat(Object.values(POS)).map(p => ({x: p.x * ctm.a + ctm.e, y: p.y * ctm.d + ctm.f}));
+}
+function overStage(p) {
+  const r = $("#stage").getBoundingClientRect();
+  return p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom;
+}
+function snapFoot(l, ideal) {
+  if (!overStage(ideal) || !meshFrame.length) return ideal;
+  const hip = localToWorld(l.hip);
+  let best = null, bd = 22;
+  for (const p of meshFrame) {
+    const d = Math.hypot(p.x - ideal.x, p.y - ideal.y);
+    if (d > bd) continue;
+    const dh = Math.hypot(p.x - hip.x, p.y - hip.y);
+    if (dh < 12 || dh > REACH - 1) continue;
+    const lp = worldToLocal(p);
+    if (lp.y * l.side < 4) continue;
+    best = p; bd = d;
+  }
+  return clampReach(best ? {x: best.x, y: best.y} : ideal);
+}
+function pickWaypoint(first) {
+  const b = roamBounds();
+  if (first) {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 100 + Math.random() * 36;
+    let dest = {
+      x: clamp(PET.x + Math.cos(ang) * dist, b.minX, b.maxX),
+      y: clamp(PET.y + Math.sin(ang) * dist, b.minY, b.maxY),
+    };
+    if (Math.hypot(dest.x - PET.x, dest.y - PET.y) < 70) dest = {x: clamp(PET.x + 120, b.minX, b.maxX), y: PET.y};
+    return dest;
+  }
+  const stage = $("#stage").getBoundingClientRect();
+  const main = document.querySelector("main").getBoundingClientRect();
+  for (let n = 0; n < 8; n++) {
+    const roll = Math.random();
+    let p;
+    if (roll < 0.34 && stage.width > 40) {
+      p = {
+        x: clamp(stage.left + 36 + Math.random() * Math.max(24, stage.width - 72), b.minX, b.maxX),
+        y: clamp(stage.top + 28 + Math.random() * Math.max(24, stage.height - 56), b.minY, b.maxY),
+      };
+    } else if (roll < 0.7 && main.height > 40) {
+      p = {
+        x: clamp(main.left + 20 + Math.random() * Math.max(24, main.width - 40), b.minX, b.maxX),
+        y: clamp(main.top + 8 + Math.random() * Math.min(220, main.height * 0.45), b.minY, b.maxY),
+      };
+    } else {
+      p = {
+        x: Math.random() < 0.5 ? b.minX + Math.random() * 36 : b.maxX - Math.random() * 36,
+        y: b.minY + Math.random() * (b.maxY - b.minY),
+      };
     }
-  } else if (R) { mouth = R.kind === "fail" ? 2 : 1; }
-  M.wasWalking = SP.walking;
-  // eyes: blink (sometimes a double blink) + occasional glance (scanning)
-  if (now > M.nextBlink) { M.blinkT0 = now; M.dbl = Math.random() < 0.25; M.nextBlink = now + 2000 + Math.random() * 2600; }
-  let bu = (now - M.blinkT0) / 130; if (M.dbl && bu >= 1.5 && bu < 2.5) bu -= 1.5;
-  const blink = bu >= 0 && bu < 1 ? 1 - Math.sin(Math.PI * bu) * 0.92 : 1;
-  if (!REDUCED && now > M.nextLook) { M.lookT = SP.walking ? 0 : (Math.random() < 0.5 ? -1 : 1) * Math.random(); M.nextLook = now + 1200 + Math.random() * 2400; }
-  M.look += (M.lookT - M.look) * Math.min(1, dt * 0.01);
-
-  MG.root.setAttribute("transform", `translate(${SP.x.toFixed(1)},${SP.y.toFixed(1)}) scale(0.62)`);
-  MG.flip.setAttribute("transform", `scale(${M.face.toFixed(3)},1)`);
-  MG.hop.setAttribute("transform", `translate(0,${hopY.toFixed(2)})`);
-  MG.lean.setAttribute("transform", `translate(${shakeX.toFixed(2)},0) rotate(${(lean + tilt * 0.6).toFixed(2)})`);
-  MG.sq.setAttribute("transform", `translate(0,-2) scale(${sx.toFixed(3)},${sy.toFixed(3)}) translate(0,2)`);
-  MG.face.setAttribute("transform", `translate(${(M.look * 1.6).toFixed(2)},0) rotate(${(tilt * 0.5).toFixed(2)} 0 -55)`);
-  const ss = (0.55 + 0.45 * ground).toFixed(3);
-  MG.shadow.setAttribute("transform", `scale(${ss},${ss})`); MG.shadow.style.opacity = "0.35";
-  MG.ring.style.opacity = "0.18";
-  MG.halo.style.opacity = "0.16";
-  MG.legF.setAttribute("transform", `rotate(${legF.toFixed(1)} 10 -3)`);
-  MG.legB.setAttribute("transform", `rotate(${legB.toFixed(1)} -10 -3)`);
-  MG.armF.setAttribute("transform", `rotate(${armF.toFixed(1)} 20 -42)`);
-  MG.armB.setAttribute("transform", `rotate(${(-armB).toFixed(1)} -20 -42)`);
-  MG.eyes.setAttribute("transform", `translate(0,-58) scale(1,${blink.toFixed(3)}) translate(0,58)`);
-  MG.pupils.forEach(p => p.setAttribute("transform", `translate(${(M.look * 1.4).toFixed(2)},${(-Math.abs(M.look) * 0.6).toFixed(2)})`));
-  MG.smile.setAttribute("opacity", mouth === 0 ? 1 : 0); MG.grin.setAttribute("opacity", mouth === 1 ? 1 : 0); MG.oh.setAttribute("opacity", mouth === 2 ? 1 : 0);
-  MG.blush.forEach(b => { b.setAttribute("opacity", Math.min(1, 0.85 * blushK).toFixed(2)); b.setAttribute("rx", (6.4 * (0.9 + 0.1 * blushK)).toFixed(2)); });
-  MG.sparks.forEach(s => {
-    const idle = REDUCED ? 0 : Math.pow(Math.max(0, Math.sin(now / 900 + s.ph)), 14);
-    const v = Math.max(idle, spark * (0.6 + 0.4 * Math.sin(now / 70 + s.ph)));
-    s.e.setAttribute("opacity", v.toFixed(2));
-    if (v > 0.01) s.e.setAttribute("transform", `translate(${s.x},${(s.y + hopY * 0.4).toFixed(1)}) rotate(${REDUCED ? 0 : ((now / 12 + s.ph * 60) % 360).toFixed(0)}) scale(${(0.35 + 0.85 * v).toFixed(2)})`);
-  });
-  positionBubble();
-  requestAnimationFrame(renderMascot);
+    const log = $("#logs");
+    if (log) {
+      const r = log.getBoundingClientRect();
+      if (p.y > r.top + 34 && p.y < r.bottom - 8 && p.x > r.left + 16 && p.x < r.right - 16) continue;
+    }
+    for (const card of document.querySelectorAll("main .card")) {
+      const r = card.getBoundingClientRect();
+      if (p.x > r.left + 24 && p.x < r.right - 24 && p.y > r.top + 42 && p.y < r.bottom - 16) {
+        p = {x: p.x, y: clamp(r.top + 6, b.minY, b.maxY)};
+      }
+    }
+    if (Math.hypot(p.x - PET.x, p.y - PET.y) > 64) return p;
+  }
+  return {x: b.minX + Math.random() * (b.maxX - b.minX), y: b.minY + Math.random() * (b.maxY - b.minY)};
 }
-
+function beginWalk(now, first) {
+  const dest = pickWaypoint(!!first);
+  const dist = Math.max(1, Math.hypot(dest.x - PET.x, dest.y - PET.y));
+  const speed = first ? 88 : (60 + Math.random() * 34);
+  seg = {from: {x: PET.x, y: PET.y}, to: dest, t0: now, dur: Math.max(320, dist / speed * 1000)};
+  PET.hT = Math.atan2(dest.y - PET.y, dest.x - PET.x);
+  PET.walking = true;
+}
+function petHop() { if (!REDUCED && !holderPaused()) hopUntil = performance.now() + 280; }
+function clampReach(p) {
+  const dx = p.x - PET.x, dy = p.y - PET.y, d = Math.hypot(dx, dy);
+  if (d <= 52 || d < 1) return p;
+  const k = 52 / d;
+  return {x: PET.x + dx * k, y: PET.y + dy * k};
+}
+function knee(hip, foot) {
+  const dx = foot.x - hip.x, dy = foot.y - hip.y;
+  const d = Math.max(8, Math.min(REACH - 0.4, Math.hypot(dx, dy)));
+  const base = Math.atan2(dy, dx);
+  const a = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+  const k1 = {x: hip.x + Math.cos(base + a) * L1, y: hip.y + Math.sin(base + a) * L1};
+  const k2 = {x: hip.x + Math.cos(base - a) * L1, y: hip.y + Math.sin(base - a) * L1};
+  const c = {x: PET.x, y: PET.y};
+  const d1 = Math.hypot(k1.x - c.x, k1.y - c.y), d2 = Math.hypot(k2.x - c.x, k2.y - c.y);
+  const outer = d1 >= d2 ? k1 : k2, inner = d1 >= d2 ? k2 : k1;
+  return Math.max(d1, d2) > 54 ? inner : outer;
+}
+function footRipple(world) {
+  if (REDUCED) return;
+  const c = el("circle", {cx: (world.x - PET.x).toFixed(1), cy: (world.y - PET.y).toFixed(1), r: 8, class: "foot-ripple"}, $("#pet-fx"));
+  setTimeout(() => c.remove(), 650);
+}
+let lastPet = performance.now();
+function renderSpider(now) {
+  const dt = Math.min(40, now - lastPet); lastPet = now;
+  const paused = holderPaused();
+  if (REDUCED || paused) { seg = null; PET.walking = false; }
+  else if (!walkArmed) { walkArmed = true; beginWalk(now, true); nextShuffle = now + 10000 + Math.random() * 8000; }
+  if (seg) {
+    const u = Math.max(0, Math.min(1, (now - seg.t0) / seg.dur));
+    const e = easeIO(u);
+    PET.x = seg.from.x + (seg.to.x - seg.from.x) * e;
+    PET.y = seg.from.y + (seg.to.y - seg.from.y) * e;
+    PET.hT = Math.atan2(seg.to.y - seg.from.y, seg.to.x - seg.from.x);
+    if (u >= 1) {
+      PET.x = seg.to.x; PET.y = seg.to.y; PET.walking = false; seg = null;
+      restUntil = now + 800 + Math.random() * 1200;
+      hopUntil = now + 260;
+    }
+  } else if (!REDUCED && !paused && now >= restUntil) {
+    if (now > nextShuffle) { nextShuffle = now + 10000 + Math.random() * 8000; beginWalk(now, true); }
+    else beginWalk(now, false);
+  }
+  const b = roamBounds();
+  if (PET.x < b.minX || PET.x > b.maxX || PET.y < b.minY || PET.y > b.maxY) {
+    PET.x = clamp(PET.x, b.minX, b.maxX);
+    PET.y = clamp(PET.y, b.minY, b.maxY);
+    seg = null; PET.walking = false; restUntil = now + 500;
+  }
+  PET.h += angDiff(PET.h, PET.hT) * Math.min(1, dt * (PET.walking ? 0.016 : 0.005));
+  const host = $("#desk-pet");
+  host.style.left = "0px"; host.style.top = "0px";
+  host.style.transform = `translate(${PET.x.toFixed(1)}px,${PET.y.toFixed(1)}px)`;
+  $("#pet-facing").setAttribute("transform", `rotate(${(PET.h * 180 / Math.PI).toFixed(2)})`);
+  let bob = 0, hop = 0;
+  if (!REDUCED) {
+    const amp = paused ? 1.1 : 2.3;
+    bob = Math.sin(now / 980) * amp;
+    if (now < hopUntil) hop = Math.sin((1 - (hopUntil - now) / 280) * Math.PI) * -7;
+  }
+  $("#pet-bob").setAttribute("transform", `translate(0,${(bob + hop).toFixed(2)})`);
+  if (!REDUCED && now > nextBlink) { blinkT0 = now; nextBlink = now + 2500 + Math.random() * 1500; }
+  const bu = (now - blinkT0) / 110;
+  const blink = (!REDUCED && bu >= 0 && bu < 1) ? Math.max(0.12, 1 - Math.sin(Math.PI * bu) * 0.88) : 1;
+  $("#pet-eyes").setAttribute("transform", `translate(28,0) scale(1,${blink.toFixed(3)}) translate(-28,0)`);
+  refreshMesh();
+  const fwd = {x: Math.cos(PET.h), y: Math.sin(PET.h)};
+  const stepping = [0, 0];
+  LEGS.forEach(l => { if (l.stepping) stepping[l.group]++; });
+  for (const l of LEGS) {
+    const hip = localToWorld(l.hip);
+    if (REDUCED || paused) {
+      l.stepping = false;
+      l.foot = clampReach(localToWorld(l.rest));
+    } else if (!l.stepping) {
+      const restW = localToWorld(l.rest);
+      if (PET.walking) {
+        const ideal = {x: restW.x + fwd.x * 10, y: restW.y + fwd.y * 10};
+        const drift = Math.hypot(l.foot.x - ideal.x, l.foot.y - ideal.y);
+        const over = Math.hypot(l.foot.x - hip.x, l.foot.y - hip.y) > REACH - 1;
+        if ((drift > 20 && !stepping[1 - l.group]) || over) {
+          l.from = {...l.foot}; l.to = snapFoot(l, ideal); l.t0 = now; l.dur = 150; l.stepping = true; stepping[l.group]++;
+        }
+      } else if (Math.hypot(l.foot.x - restW.x, l.foot.y - restW.y) > 26 && !stepping[1 - l.group]) {
+        l.from = {...l.foot}; l.to = snapFoot(l, restW); l.t0 = now; l.dur = 180; l.stepping = true; stepping[l.group]++;
+        l.nextIdle = now + 700 + Math.random() * 1400;
+      } else if (now > l.nextIdle && l.i === 0 && !stepping[1 - l.group]) {
+        const reach = snapFoot(l, clampReach({x: restW.x + fwd.x * 14, y: restW.y + fwd.y * 8}));
+        l.from = {...l.foot}; l.to = reach; l.t0 = now; l.dur = 300; l.stepping = true; stepping[l.group]++;
+        l.nextIdle = now + 900 + Math.random() * 2200;
+      }
+    }
+    let foot = l.foot;
+    if (l.stepping) {
+      const u = Math.min(1, (now - l.t0) / l.dur), e = easeIO(u);
+      foot = clampReach({x: l.from.x + (l.to.x - l.from.x) * e, y: l.from.y + (l.to.y - l.from.y) * e});
+      if (u >= 1) {
+        l.stepping = false; l.foot = {...l.to}; foot = l.foot;
+        if (!PET.walking) footRipple(foot);
+      }
+    }
+    const k = knee(hip, foot);
+    const hp = worldToLocal(hip), kp = worldToLocal(k), fp = worldToLocal(foot);
+    l.line.setAttribute("points", `${hp.x.toFixed(1)},${hp.y.toFixed(1)} ${kp.x.toFixed(1)},${kp.y.toFixed(1)} ${fp.x.toFixed(1)},${fp.y.toFixed(1)}`);
+    l.kd.setAttribute("cx", kp.x.toFixed(1)); l.kd.setAttribute("cy", kp.y.toFixed(1));
+    l.fd.setAttribute("cx", fp.x.toFixed(1)); l.fd.setAttribute("cy", fp.y.toFixed(1));
+  }
+  if (typeof positionBubble === "function") positionBubble();
+  if (!REDUCED) requestAnimationFrame(renderSpider);
+}
+function bootSpider() {
+  buildLegs();
+  plantVisible();
+  LEGS.forEach(l => { l.foot = clampReach(localToWorld(l.rest)); });
+  const now = performance.now();
+  if (REDUCED) {
+    renderSpider(now);
+    addEventListener("resize", () => {
+      plantVisible();
+      LEGS.forEach(l => { l.foot = clampReach(localToWorld(l.rest)); l.stepping = false; });
+      renderSpider(performance.now());
+    });
+    return;
+  }
+  renderSpider(now);
+}
 
 // ------------------------------------------------------------- caption bubble
 const bubble = $("#bubble");
@@ -649,7 +773,7 @@ function positionBubble() {
   if (!bubble.classList.contains("show")) return;
   const svg = $("#web"), m = svg.getScreenCTM(); if (!m) return;
   const st = $("#stage").getBoundingClientRect(), k = m.a;
-  const sx = m.a * SP.x + m.e - st.left, sy = m.d * SP.y + m.f - st.top;
+  const sx = m.a * TOUR.x + m.e - st.left, sy = m.d * TOUR.y + m.f - st.top;
   const bw = bubble.offsetWidth, bh = bubble.offsetHeight;
   let left = sx + 28 * k, top = sy - bh - 62 * k;
   if (left + bw > st.width - 10) left = sx - 52 * k - bw;
@@ -678,6 +802,7 @@ function pillNode(id, key, val, extraCls) {
   const rect = el("rect", {x:12, y:10, height:38, rx:6, class:"box"}, g);
   const k = el("text", {x:22, y:25, class:"k"}, g); k.textContent = key;
   const v = el("text", {x:22, y:41, class:"v"}, g); v.textContent = val;
+  el("circle", {r:13, class:"selring"}, g);
   el("circle", {r:10, class:"ringn"}, g);
   el("circle", {r:5, class:"dotn"}, g);
   const fit = () => { rect.setAttribute("width", Math.max(112, Math.max(k.getComputedTextLength(), v.getComputedTextLength()) + 22)); };
@@ -702,14 +827,15 @@ function buildStage(row) {
   if (cardUrl) { cardBox.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", cardUrl); const tt = el("title", {}, cardBox); tt.textContent = `Open ${mint} on pump.fun (new tab)`; }
   el("rect", {x:bx, y:by, width:bw, height:bh, rx:6, class:"card-bg"}, cardBox);
   const tg = el("text", {x:bx + 10, y:by - 6, class:"card-tag"}, cardBox); tg.textContent = "Coin";
-  el("rect", {x:bx + 12, y:by + 14, width:34, height:34, rx:6, fill:"none", stroke:"#2C3530", "stroke-width":1}, cardBox);
+  el("rect", {x:bx + 12, y:by + 14, width:34, height:34, rx:6, fill:"none", stroke:"#2A322E", "stroke-width":1}, cardBox);
   const av = el("text", {x:bx + 29, y:by + 37, "text-anchor":"middle", class:"card-av"}, cardBox); av.textContent = (sym[0] || "?").toUpperCase();
   const nm = el("text", {x:bx + 56, y:by + 29, class:"card-name"}, cardBox); nm.textContent = trunc(c.name || sym, 18);
   const at = el("text", {x:bx + 56, y:by + 46, class:"card-at"}, cardBox);
   at.textContent = `$${trunc(s.symbol || "?", 10)}` + (c.curve_progress != null ? ` · curve ${(c.curve_progress * 100).toFixed(0)}%` : "") + (c.age_min != null ? ` · ${Math.round(c.age_min)}m` : "");
   const ln = el("text", {x:bx + 12, y:by + 76, class:"card-line"}, cardBox); ln.textContent = row ? `mid $${px(price)} · mcap ${usdK(c.market_cap_usd)}` : "no decision yet · hit Run";
   if (cardUrl) { const mt = el("text", {x:bx + 12, y:by + 98, class:"card-mint"}, cardBox); mt.textContent = `CA ${shortMint(mint)} ↗ pump.fun`; }
-  [[bx, by], [bx, by + bh], [0, by + bh]].forEach(([x, y]) => el("circle", {cx:x, cy:y, r:3.2, fill:"#8E9791"}, hub));
+  [[bx, by], [bx, by + bh], [0, by + bh]].forEach(([x, y]) => el("circle", {cx:x, cy:y, r:3.2, fill:"#8B968F"}, hub));
+  el("circle", {r:14, class:"selring"}, hub);
   el("circle", {r:10, class:"ringn"}, hub); el("circle", {r:5.5, class:"dotn"}, hub);
   NODES.coin = {id:"coin", x:cp.x, y:cp.y, g:hub};
 
@@ -747,6 +873,7 @@ function buildStage(row) {
   const atx = el("text", {x:0, y:45, "text-anchor":"middle", class:"act-text"}, inner); atx.textContent = "…";
   const as1 = el("text", {x:0, y:62, "text-anchor":"middle", class:"act-sub"}, inner); as1.textContent = "verdict pending";
   const as2 = el("text", {x:0, y:76, "text-anchor":"middle", class:"act-sub"}, inner); as2.textContent = `dry-run · live_order ${row ? !!row.live_order : false}`;
+  el("circle", {r:14, class:"selring"}, ag);
   el("circle", {r:11, class:"ringn"}, ag); el("circle", {r:6, class:"dotn"}, ag);
   NODES.action = {id:"action", x:ap.x, y:ap.y, g:ag, reveal: () => {
     const withheld = row && (row.data_status === "insufficient" || d.confident === false);
@@ -781,33 +908,33 @@ function ripple(x, y, color, k = 1) {   // square scan-box burst
 // ------------------------------------------------------------- crawling along graph edges
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 let tourToken = 0, trailPts = [];
-function drawTrail() { $("#trail").setAttribute("d", trailPts.length ? "M" + trailPts.map(p => p.x.toFixed(1) + "," + p.y.toFixed(1)).join("L") + `L${SP.x.toFixed(1)},${SP.y.toFixed(1)}` : ""); }
+const TOUR = { x: POS.coin.x, y: POS.coin.y, at: "coin", walking: false };
+function drawTrail() { $("#trail").setAttribute("d", trailPts.length ? "M" + trailPts.map(p => p.x.toFixed(1) + "," + p.y.toFixed(1)).join("L") + `L${TOUR.x.toFixed(1)},${TOUR.y.toFixed(1)}` : ""); }
 async function walkTo(to, token) {
-  const from = {x: SP.x, y: SP.y}, len = Math.hypot(to.x - from.x, to.y - from.y);
-  if (SP.at && EDGE[ek(SP.at, to.id)]) EDGE[ek(SP.at, to.id)].classList.add("lit");
+  const from = {x: TOUR.x, y: TOUR.y}, len = Math.hypot(to.x - from.x, to.y - from.y);
+  if (TOUR.at && EDGE[ek(TOUR.at, to.id)]) EDGE[ek(TOUR.at, to.id)].classList.add("lit");
   if (!trailPts.length) trailPts.push({...from});
-  if (len < 1) { SP.at = to.id; return; }
+  if (len < 1) { TOUR.at = to.id; return; }
   const dur = Math.max(420, len / (REDUCED ? 600 : 260) * 1000);
-  SP.hT = Math.atan2(to.y - from.y, to.x - from.x); SP.walking = true; sayTyping();
+  TOUR.walking = true; sayTyping();
   const t0 = performance.now();
   await new Promise(res => {
     function frame(now) {
       if (token !== tourToken) return res();
       const u = Math.max(0, Math.min(1, (now - t0) / dur)), e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
-      SP.x = from.x + (to.x - from.x) * e; SP.y = from.y + (to.y - from.y) * e;
-      drawTrail();
+      TOUR.x = from.x + (to.x - from.x) * e; TOUR.y = from.y + (to.y - from.y) * e;
+      drawTrail(); positionBubble();
       u < 1 ? requestAnimationFrame(frame) : res();
     }
     requestAnimationFrame(frame);
   });
-  SP.walking = false; SP.at = to.id; trailPts.push({x: to.x, y: to.y}); drawTrail();
+  TOUR.walking = false; TOUR.at = to.id; trailPts.push({x: to.x, y: to.y}); drawTrail();
 }
 
-let entered = false;
 async function tour(row) {
   const token = ++tourToken;
   buildStage(row);
-  if (!entered) { entered = true; SP.x = -170; SP.y = POS.coin.y; SP.at = null; }
+  TOUR.x = POS.coin.x; TOUR.y = POS.coin.y; TOUR.at = "coin";
   while (token === tourToken) {
     resetLoopVisuals();
     for (let i = 0; i < STOPS.length; i++) {
@@ -822,8 +949,8 @@ async function tour(row) {
         const res = n.res; n.v.textContent = res == null ? "—" : res ? "PASS" : "FAIL"; n.fit();
         if (res != null) n.g.classList.add(res ? "pass" : "fail");
         const [h1, h2] = GSTR[st.id];
-        if (res === true) { h1.classList.add("pass"); h2.classList.add("pass"); ripple(n.x, n.y, "#86efac"); mascotReact("pass"); }
-        else if (res === false) { h1.classList.add("fail"); h2.classList.add("fail"); ripple(n.x, n.y, "#E08A82"); mascotReact("fail");
+        if (res === true) { h1.classList.add("pass"); h2.classList.add("pass"); ripple(n.x, n.y, "#86efac"); petHop(); }
+        else if (res === false) { h1.classList.add("fail"); h2.classList.add("fail"); ripple(n.x, n.y, "#E08A82"); petHop();
           requestAnimationFrame(() => { h1.style.transform = "rotate(8deg)"; h2.style.transform = "rotate(-8deg)"; });
           setTimeout(() => { if (token === tourToken) { h1.style.opacity = .55; h2.style.opacity = .55; } }, 900); }
         else ripple(n.x, n.y, "#8E9791");
@@ -833,14 +960,14 @@ async function tour(row) {
         const withheld = row && (row.data_status === "insufficient" || intent.confident === false);
         const ac = withheld ? "bad" : actionClass(intent.action);
         ripple(n.x, n.y, ac === "ok" ? "#86efac" : ac === "bad" ? "#E08A82" : "#C6B48A");
-        mascotReact(ac === "bad" ? "fail" : "pass");
+        petHop();
       }
       else ripple(n.x, n.y, "#86efac");
       await say(st.text, st.mood, token);
       await sleep(st.id === "action" ? 3600 : st.gate ? 1400 : 1100);
     }
     if (!row || token !== tourToken) return;
-    mascotReact("pass"); await say("> graph mapped ✓ re-crawling from target…", "", token);
+    petHop(); await say("> graph mapped ✓ re-crawling from target…", "", token);
     await sleep(900);
     await walkTo(NODES.coin, token);
     await sleep(400);
@@ -853,13 +980,14 @@ function startDust() {
   const resize = () => { const dpr = devicePixelRatio || 1; Wd = cv.clientWidth; Hd = cv.clientHeight; cv.width = Wd * dpr; cv.height = Hd * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0); };
   resize(); new ResizeObserver(resize).observe(cv);
   const cols = ["134,239,172"];
-  const P = Array.from({length: REDUCED ? 0 : 12}, () => ({x: Math.random(), y: Math.random(), s: 1 + Math.random() * 1.2,
+  const P = Array.from({length: REDUCED ? 0 : 10}, () => ({x: Math.random(), y: Math.random(), s: 1 + Math.random() * 1.2,
     vx: (Math.random() - .5) * .00004, vy: -.00002 - Math.random() * .00004, c: cols[0], ph: Math.random() * 6.28}));
   (function f(now) {
     cx.clearRect(0, 0, Wd, Hd);
     for (const p of P) {
       p.x += p.vx * 16; p.y += p.vy * 16; if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); } if (p.x < 0) p.x = 1; if (p.x > 1) p.x = 0;
-      cx.fillStyle = `rgba(${p.c},${(.04 + .06 * (0.5 + 0.5 * Math.sin(now / 900 + p.ph))).toFixed(2)})`;
+      const mote = Math.min(0.35, 0.16 + 0.18 * (0.5 + 0.5 * Math.sin(now / 900 + p.ph)));
+      cx.fillStyle = `rgba(${p.c},${mote.toFixed(2)})`;
       cx.fillRect(p.x * Wd, p.y * Hd, p.s, p.s);
     }
     requestAnimationFrame(f);
@@ -881,7 +1009,7 @@ async function refresh(forceTour) {
 
 $("#run").addEventListener("click", async () => {
   const b = $("#run"); b.disabled = true; $("#status").textContent = "running desk.py --pump (dry-run)…"; $("#stage").classList.add("busy");
-  tourToken++; SP.walking = false; say("> spawning fresh dry-run cycle… crawling", "", tourToken);
+  tourToken++; TOUR.walking = false; say("> spawning fresh dry-run cycle… crawling", "", tourToken);
   try {
     const r = await fetch("/api/run", {method:"POST"}); const j = await r.json();
     $("#status").textContent = j.ok ? `done in ${j.wall_ms} ms · live_order ${j.live_order}` : `error: ${j.error || j.stderr_tail || "rc " + j.returncode}`;
@@ -889,7 +1017,7 @@ $("#run").addEventListener("click", async () => {
   b.disabled = false; $("#stage").classList.remove("busy"); await refresh(true);
 });
 
-drawMesh(); drawEdges(); buildMascot(); startDust(); requestAnimationFrame(renderMascot);
+drawMesh(); drawEdges(); bootSpider(); startDust();
 refresh(true);
 setInterval(() => refresh(false), 15000);
 </script>
