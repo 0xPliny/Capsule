@@ -255,6 +255,33 @@ def _stamp_source(outcomes: list[dict], snapshot: dict) -> None:
         gate["endpoint"] = endpoint
 
 
+def _role_present(value) -> bool:
+    return value is not None and value != ""
+
+
+def tag_evidence_roles(gate: dict) -> dict:
+    """observed = print, derived = computed, cited = threshold line.
+
+    A missing number is insufficient. That matches the fail-closed desk:
+    no value, no confident distance.
+    """
+    return {
+        "threshold": "cited" if _role_present(gate.get("threshold")) else "insufficient",
+        "value": "observed" if _role_present(gate.get("value")) else "insufficient",
+        "distance": "derived" if gate.get("distance") is not None else "insufficient",
+        "endpoint": "observed" if _role_present(gate.get("endpoint")) else "insufficient",
+        "source_id": "observed" if _role_present(gate.get("source_id")) else "insufficient",
+        "snapshot_hash": "observed" if _role_present(gate.get("snapshot_hash")) else "insufficient",
+        "fetched_at": "observed" if _role_present(gate.get("fetched_at")) else "insufficient",
+        "decided_at": "observed" if _role_present(gate.get("decided_at")) else "insufficient",
+    }
+
+
+def _stamp_roles(outcomes: list[dict]) -> None:
+    for gate in outcomes:
+        gate["roles"] = tag_evidence_roles(gate)
+
+
 def _gate_passed(outcomes: list[dict], name: str) -> bool:
     for g in outcomes:
         if g["name"] == name:
@@ -309,6 +336,7 @@ def decide(snapshot: dict, judgment: dict, threshold_set: dict | None = None) ->
         intent = intent_from_gates(snapshot, judgment, outcomes)
         intent["confident"] = True
         status = "ok"
+    _stamp_roles(outcomes)
     return {
         "intent": intent,
         "gates": outcomes,
