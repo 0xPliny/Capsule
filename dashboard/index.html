@@ -238,15 +238,13 @@
           <ellipse cx="6" cy="12" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(58 6 12)"/>
           <ellipse cx="44" cy="10" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(-36 44 10)"/>
           <ellipse cx="20" cy="-20" rx="7" ry="3.1" fill="#FFFFFF" opacity=".78" transform="rotate(-28 20 -20)"/>
-          <ellipse cx="18" cy="-16" rx="3.2" ry="2.4" fill="#FFB4C0" opacity=".9"/>
-          <ellipse cx="18" cy="-6" rx="3.2" ry="2.4" fill="#FFB4C0" opacity=".9"/>
+          <ellipse class="pet-blush" cx="16.5" cy="-6.5" rx="3.4" ry="2.2" fill="#FFB4C0" opacity=".85"/>
+          <ellipse class="pet-blush" cx="31.5" cy="-6.5" rx="3.4" ry="2.2" fill="#FFB4C0" opacity=".85"/>
           <g id="pet-eyes">
-            <ellipse cx="31" cy="-15" rx="2.35" ry="3.15" fill="#0A0A0A"/>
-            <ellipse cx="31" cy="-7.2" rx="2.35" ry="3.15" fill="#0A0A0A"/>
-            <circle cx="30.2" cy="-16.1" r="1" fill="#FFFFFF"/>
-            <circle cx="30.2" cy="-8.3" r="1" fill="#FFFFFF"/>
+            <ellipse cx="19.5" cy="-9.5" rx="2.6" ry="3.6" fill="#0A0A0A"/>
+            <ellipse cx="28.5" cy="-9.5" rx="2.6" ry="3.6" fill="#0A0A0A"/>
           </g>
-          <path d="M27.2,-4.6 Q32.2,-1.8 36.6,-4.6" fill="none" stroke="#1A1A1A" stroke-width="1.2" stroke-linecap="round"/>
+          <path id="pet-smile" d="M21.2,-5.2 Q24,-3.4 26.8,-5.2" fill="none" stroke="#0A0A0A" stroke-width="1.05" stroke-linecap="round"/>
         </g>
       </g>
     </g>
@@ -728,7 +726,7 @@ function renderSpider(now) {
   if (!REDUCED && now > nextBlink) { blinkT0 = now; nextBlink = now + 2500 + Math.random() * 1500; }
   const bu = (now - blinkT0) / 110;
   const blink = (!REDUCED && bu >= 0 && bu < 1) ? Math.max(0.12, 1 - Math.sin(Math.PI * bu) * 0.88) : 1;
-  $("#pet-eyes").setAttribute("transform", `translate(31,-11) scale(1,${blink.toFixed(3)}) translate(-31,11)`);
+  $("#pet-eyes").setAttribute("transform", `translate(24,-9.5) scale(1,${blink.toFixed(3)}) translate(-24,9.5)`);
   refreshMesh();
   const fwd = {x: Math.cos(PET.h), y: Math.sin(PET.h)};
   const stepping = [0, 0];
