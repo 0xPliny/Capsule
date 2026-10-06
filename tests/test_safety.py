@@ -96,6 +96,34 @@ def test_dashboard_binds_localhost_only():
     assert dash_server.BASE_PORT == 8791 or isinstance(dash_server.BASE_PORT, int)
 
 
+def test_holder_rpc_rejects_trade_methods():
+    import holders
+
+    called = []
+
+    def transport(method, params):
+        called.append(method)
+        return {}
+
+    try:
+        holders.fetch_holder_rows("PaperDemoMint111111111111111111111111111", transport=transport)
+    except Exception:
+        pass
+    assert "sendTransaction" not in called
+    assert holders.READ_METHODS.isdisjoint({
+        "sendTransaction", "signTransaction", "simulateTransaction",
+    })
+    src = _read(ROOT / "holders.py")
+    assert "sendTransaction" not in src
+    assert "signTransaction" not in src
+    assert LIVE_TRUE_RE.search(src) is None
+    assert "api.mainnet-beta.solana.com" in src
+    for line in src.splitlines():
+        code = line.split("#", 1)[0]
+        if WALLET_RE.search(code):
+            raise AssertionError(f"wallet pattern in holders.py: {line.strip()}")
+
+
 def test_pump_urls_are_get_only():
     src = _read(ROOT / "sources.py")
     for match in REMOTE_URL_RE.finditer(src):

@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from gates import decide, tag_evidence_roles
+from holders import sanitize_snapshot
 from sources import DemoSource, PumpSource, ReplaySource
 import scoreboard
 import watchlist
@@ -101,6 +102,7 @@ def build_record(
     fetch_ms: float,
     run_id: str | None = None,
 ) -> dict:
+    snapshot = sanitize_snapshot(snapshot)
     mint = ((snapshot.get("coin") or {}).get("mint") or snapshot.get("mint"))
     decided_at = datetime.now(timezone.utc).isoformat()
     snap_hash = canonical_hash(snapshot)
@@ -131,6 +133,7 @@ def build_record(
         "intent": decided["intent"],
         "data_status": decided.get("data_status", "ok"),
         "threshold_set_id": decided["threshold_set_id"],
+        "holder_risk": decided.get("holder_risk"),
         "live_order": False,
         "elapsed_ms": elapsed_ms,
         "fetch_ms": fetch_ms,

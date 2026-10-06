@@ -1,9 +1,13 @@
 {
   "id": "default_v1",
+  "notes": {
+    "holder_cluster": "op lt 0.35 (same cut as holders.OK_LT). Score 0..1 from shared funder, same-block buys, and linked holders. Below 0.35 finishes as holder_risk OK (paper check, not a buy clearance). no_cluster is true only when that OK check found no group. A found cluster sets no_cluster false even if the score is still under 0.35. 0.35 inclusive to 0.60 is RISKY. 0.60 and above is DANGER. Missing or incomplete holder rows omit verdict, set state to error, and set no_cluster false."
+  },
   "gates": [
     {"name": "inventory", "field": "inventory", "op": "lt", "threshold": 1.5, "order": 1},
     {"name": "toxic_flow", "field": "toxic_flow", "op": "lt", "threshold": 0.55, "order": 2},
     {"name": "quote_env", "field": "quote_env", "op": "ge", "threshold": 0.55, "order": 3},
-    {"name": "liquidity", "field": "liquidity", "op": "ge", "threshold": 1.0, "order": 4}
+    {"name": "liquidity", "field": "liquidity", "op": "ge", "threshold": 1.0, "order": 4},
+    {"name": "holder_cluster", "field": "holder_cluster", "op": "lt", "threshold": 0.35, "order": 5}
   ]
 }

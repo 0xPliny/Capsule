@@ -19,6 +19,7 @@ import scoreboard
 import watchlist
 from desk import watch_once
 from gates import decide
+from holders import sample_holder_rows
 
 ROOT = Path(__file__).resolve().parent.parent
 MINT = "So11111111111111111111111111111111111111112"
@@ -61,6 +62,16 @@ def _src(judgment, ts, price, direction=None, mint=MINT):
                     "error": None,
                     "fetched_at": ts,
                 }],
+                # Independent rows so holder_cluster can finish OK. A missing
+                # read still fail-closes; these paper marks need a real pass.
+                "holders": {
+                    "rows": sample_holder_rows(),
+                    "supply": 100,
+                    "endpoint": "offline:paper-holders",
+                    "observed": True,
+                    "sample": False,
+                    "source_id": "mint",
+                },
             }
             if price is None:
                 snap["missing_fields"] = ["price.last_usd"]

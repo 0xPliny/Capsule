@@ -14,7 +14,7 @@ def test_threshold_set_id_default():
     tset = load_threshold_set()
     assert tset["id"] == "default_v1"
     names = [g["name"] for g in sorted(tset["gates"], key=lambda g: g["order"])]
-    assert names == ["inventory", "toxic_flow", "quote_env", "liquidity"]
+    assert names == ["inventory", "toxic_flow", "quote_env", "liquidity", "holder_cluster"]
 
 
 def test_paper_long(demo_snapshot, passing_judgment):
@@ -23,7 +23,9 @@ def test_paper_long(demo_snapshot, passing_judgment):
     assert out["intent"]["action"] == "paper_long"
     assert out["intent"]["risk_usd"] == 200
     assert all(g["passed"] for g in out["gates"])
-    assert [g["name"] for g in out["gates"]] == ["inventory", "toxic_flow", "quote_env", "liquidity"]
+    assert [g["name"] for g in out["gates"]] == [
+        "inventory", "toxic_flow", "quote_env", "liquidity", "holder_cluster",
+    ]
 
 
 def test_paper_short(demo_snapshot, passing_judgment):
@@ -84,8 +86,11 @@ def test_judgment_error_holds_and_still_records_gates(demo_snapshot):
     assert out["intent"]["reason"].startswith("insufficient data:")
     assert "TYPESAFE_API_KEY not set" in out["intent"]["reason"]
     assert "source=demo" in out["intent"]["reason"]
-    assert len(out["gates"]) == 4
-    assert all(g["passed"] is False for g in out["gates"])
+    assert len(out["gates"]) == 5
+    by_name = {g["name"]: g for g in out["gates"]}
+    assert by_name["holder_cluster"]["passed"] is True
+    assert by_name["inventory"]["passed"] is False
+    assert by_name["toxic_flow"]["passed"] is False
     assert all(g["reason"] for g in out["gates"])
 
 
@@ -103,8 +108,10 @@ def test_inventory_wins_policy_order(demo_snapshot, passing_judgment):
 
 def test_evaluate_all_gates_on_early_fail(demo_snapshot, passing_judgment):
     outcomes = evaluate_gates(_judgment(passing_judgment, inventory=2.0, quote_env=0.1, liquidity=0.0))
-    assert len(outcomes) == 4
-    assert {g["name"] for g in outcomes} == {"inventory", "toxic_flow", "quote_env", "liquidity"}
+    assert len(outcomes) == 5
+    assert {g["name"] for g in outcomes} == {
+        "inventory", "toxic_flow", "quote_env", "liquidity", "holder_cluster",
+    }
 
 
 def test_custom_threshold_set(demo_snapshot, passing_judgment):

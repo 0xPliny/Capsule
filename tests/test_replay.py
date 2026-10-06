@@ -103,7 +103,9 @@ def test_run_cycle_demo_record_shape():
     assert row["source"] == "demo"
     assert row["live_order"] is False
     assert row["threshold_set_id"] == "default_v1"
-    assert isinstance(row["gates"], list) and len(row["gates"]) == 4
+    assert isinstance(row["gates"], list) and len(row["gates"]) == 5
+    assert row["holder_risk"]["verdict"] == "OK"
+    assert row["holder_risk"]["is_sample"] is True
     assert row["intent"]["action"] == "paper_long"
     assert "snapshot" in row and "judgment" in row
 
@@ -122,6 +124,10 @@ def test_cli_demo_offline():
     assert "paper_long" in p.stdout
     assert '"live_order": false' in p.stdout
     assert '"schema_v": 2' in p.stdout
+    assert '"verdict": "OK"' in p.stdout
+    assert '"is_sample": true' in p.stdout
+    assert "NO_CLUSTER" not in p.stdout
+    assert "CLEAN" not in p.stdout
 
 
 def test_cli_replay_offline(fixtures_dir):
