@@ -276,7 +276,7 @@
     <g id="fx"></g>
     <g id="mascot"></g>
   </svg>
-  <div class="hud tl"><div class="title">jev<b>::</b>pump desk</div><div id="hud-coin" style="margin-top:5px">mapping …</div></div>
+  <div class="hud tl"><div class="title">capsule<b>::</b>pump desk</div><div id="hud-coin" style="margin-top:5px">mapping …</div></div>
   <div class="hud tr"><div id="hud-step">step – / –</div><div id="prog"><i></i></div></div>
   <div class="hud bl"><span class="dot" style="background:var(--mag);margin-left:0;box-shadow:0 0 6px var(--mag)"></span>node<span class="dash" style="background:var(--cyan);box-shadow:0 0 6px var(--cyan)"></span>edge<span class="dash" style="background:var(--ok)"></span>gate holds<span class="dash" style="background:var(--bad)"></span>gate snaps<span class="dash" style="background:var(--mag)"></span>crawl path</div>
   <div class="hud br">dry-run · no orders · live_order <span id="hud-live">false</span></div>
@@ -325,15 +325,24 @@ const trunc = (s, n) => { s = String(s ?? ""); return s.length > n ? s.slice(0, 
 const SVGNS = "http://www.w3.org/2000/svg";
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const GATE_LABELS = {"toxic_flow<0.55":"toxic_flow < 0.55","quote_env>=0.55":"quote_env ≥ 0.55",
+const GATE_LABELS = {
+  inventory:"inventory < 1.5", toxic_flow:"toxic_flow < 0.55",
+  quote_env:"quote_env ≥ 0.55", liquidity:"liquidity ≥ 1.0",
+  "toxic_flow<0.55":"toxic_flow < 0.55","quote_env>=0.55":"quote_env ≥ 0.55",
   "inventory<1.5_and_not_flatten":"inventory < 1.5","liquidity>=1.0":"liquidity ≥ 1.0"};
+function gateMap(g) {
+  if (!g) return null;
+  if (Array.isArray(g)) { const o = {}; for (const x of g) if (x && x.name != null) o[x.name] = !!x.passed; return o; }
+  return g;
+}
+function rowIntent(row) { return (row && (row.intent || row.decision)) || {}; }
 
 function actionClass(a) { if (!a) return "dim"; if (a.startsWith("paper_")) return "ok"; if (a.includes("flatten")) return "bad"; return "warn"; }
 
 // ------------------------------------------------------------- panels (unchanged data)
 function renderPanels(row) {
   if (!row) { $("#coin").innerHTML = "<div>status</div><div>No decisions logged yet. Click Run dry-run.</div>"; return; }
-  const s = row.snapshot || {}, c = s.coin || {}, j = row.judgment || {}, d = row.decision || {};
+  const s = row.snapshot || {}, c = s.coin || {}, j = row.judgment || {}, d = rowIntent(row);
   const live = !!row.live_order;
   const lb = $("#live-badge"); lb.textContent = "live_order: " + live; lb.className = "badge " + (live ? "b-bad" : "b-ok");
   $("#hud-live").textContent = String(live); $("#hud-live").style.color = live ? "var(--bad)" : "var(--ok)";
@@ -343,7 +352,7 @@ function renderPanels(row) {
     <div>mid price</div><div class="mono">${px((s.price||{}).last_usd ?? (s.price||{}).mid)} USD</div>
     <div>mcap</div><div class="mono">${usd(c.market_cap_usd)}</div>
     <div>venue</div><div>${esc(s.venue)}${c.curve_progress!=null ? ` · curve ${(c.curve_progress*100).toFixed(1)}%` : ""}</div>
-    <div>elapsed_ms</div><div class="mono">${esc(row.elapsed_ms)} <span class="dim">(fetch ${esc(row.fetch_ms)} · jev ${esc(row.jev_ms)})</span></div>
+    <div>elapsed_ms</div><div class="mono">${esc(row.elapsed_ms)} <span class="dim">(fetch ${esc(row.fetch_ms)} · judgment ${esc(row.judgment_ms ?? row.jev_ms)})</span></div>
     <div>logged</div><div>${esc(tlocal(row.ts))}</div>
     <div>live_order</div><div><span class="badge ${live ? "b-bad" : "b-ok"}">${live}</span></div>
     ${s.fetch_error ? `<div>fetch error</div><div class="bad">${esc(s.fetch_error)}</div>` : ""}`;
@@ -358,7 +367,7 @@ function renderPanels(row) {
       <tr><td>quote_env</td><td class="mono">${num(j.quote_env)}</td><td class="dim">Noul p</td></tr>
       <tr><td>inventory</td><td class="mono">${num(j.inventory)}</td><td class="dim">${esc(j.inventory_label)}</td></tr></table>`;
   }
-  const g = d.gates || {};
+  const g = gateMap(row.gates) || gateMap(d.gates) || {};
   $("#gates").innerHTML = Object.keys(g).length ? Object.entries(g).map(([k,v]) =>
     `<div class="gate"><span>${esc(GATE_LABELS[k] || k)}</span><span class="${v?"ok":"bad"}">${v ? "PASS" : "FAIL"}</span></div>`).join("")
     : `<div class="dim">no gates evaluated</div>`;
@@ -635,8 +644,8 @@ function pillNode(id, key, val, extraCls) {
 
 function buildStage(row) {
   $("#nodes").innerHTML = ""; $("#gstrands").innerHTML = ""; NODES = {}; GSTR = {};
-  const s = (row && row.snapshot) || {}, c = s.coin || {}, j = (row && row.judgment) || {}, d = (row && row.decision) || {};
-  const g = d.gates || {}, price = (s.price || {}).last_usd ?? (s.price || {}).mid;
+  const s = (row && row.snapshot) || {}, c = s.coin || {}, j = (row && row.judgment) || {}, d = rowIntent(row);
+  const g = gateMap(row && row.gates) || gateMap(d.gates) || {}, price = (s.price || {}).last_usd ?? (s.price || {}).mid;
   const sym = s.symbol || c.name || "coin";
   const mint = c.mint || s.mint;
   $("#hud-coin").innerHTML = row ? `mapping $${esc(trunc(sym, 18))}${pumpUrl(mint) ? " · " + mintLink(mint, shortMint(mint)) : ""} · ${esc(tlocal(row.ts))}` : "waiting for a decision…";
@@ -698,7 +707,7 @@ function buildStage(row) {
 
   STOPS = [{id:"coin", text: row ? `> target acquired: $${trunc(sym, 16)} · mid $${px(price)} · mcap ${usdK(c.market_cap_usd)}. mapping desk graph…` : "> no decisions in the graph yet. hit Run dry-run to crawl one.", mood:""}];
   if (!row) return;
-  if (j.error) STOPS.push({id:"q0", text:`> jev unreachable: ${trunc(j.error, 90)}`, mood:"fail"});
+  if (j.error) STOPS.push({id:"q0", text:`> judgment unreachable: ${trunc(j.error, 90)}`, mood:"fail"});
   else qs.forEach((q, i) => STOPS.push({id:"q" + i, text:q[2](), mood:""}));
   gk.slice(0, 4).forEach((k, i) => {
     const lab = GATE_LABELS[k] || k, res = k in g ? g[k] : null;
@@ -754,7 +763,7 @@ async function tour(row) {
     for (let i = 0; i < STOPS.length; i++) {
       if (token !== tourToken) return;
       const st = STOPS[i], n = NODES[st.id];
-      $("#hud-step").textContent = `step ${i + 1} / ${STOPS.length} · ${st.id === "coin" ? "coin" : st.id === "action" ? "action" : st.gate ? "gate" : "jev"}`;
+      $("#hud-step").textContent = `step ${i + 1} / ${STOPS.length} · ${st.id === "coin" ? "coin" : st.id === "action" ? "action" : st.gate ? "gate" : "judgment"}`;
       $("#prog i").style.width = ((i + 1) / STOPS.length * 100) + "%";
       await walkTo(n, token);
       if (token !== tourToken) return;
@@ -768,7 +777,7 @@ async function tour(row) {
           requestAnimationFrame(() => { h1.style.transform = "rotate(26deg) scale(.8)"; h2.style.transform = "rotate(-22deg) scale(.8)"; });
           setTimeout(() => { if (token === tourToken) { h1.style.opacity = .5; h2.style.opacity = .5; } }, 900); }
         else ripple(n.x, n.y, "#00f0ff");
-      } else if (st.id === "action") { n.reveal(); const ac = actionClass(row && row.decision ? row.decision.action : ""); ripple(n.x, n.y, ac === "ok" ? "#2bffb0" : ac === "bad" ? "#ff2b4e" : "#ffc23d"); mascotReact(ac === "bad" ? "fail" : "pass"); }
+      } else if (st.id === "action") { n.reveal(); const ac = actionClass(rowIntent(row).action); ripple(n.x, n.y, ac === "ok" ? "#2bffb0" : ac === "bad" ? "#ff2b4e" : "#ffc23d"); mascotReact(ac === "bad" ? "fail" : "pass"); }
       else ripple(n.x, n.y, st.id === "coin" ? "#ff2bd6" : "#00f0ff");
       await say(st.text, st.mood, token);
       await sleep(st.id === "action" ? 3600 : st.gate ? 1400 : 1100);

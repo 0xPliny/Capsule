@@ -4,6 +4,7 @@ data/
 .env.*
 __pycache__/
 *.pyc
+*.pyo
 dashboard/__pycache__/
 dashboard/*.log
 dashboard/url.txt
@@ -12,3 +13,13 @@ dashboard/preview_*.png
 *.log
 .DS_Store
 Thumbs.db
+
+# backups / editor leftovers
+*backup*
+*_backup*
+*.bak
+*.orig
+*~
+dashboard_index_*_backup.html
+*.swp
+*.swo

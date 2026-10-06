@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Jev desk local dashboard (dry-run only).
+"""Capsule local dashboard (dry-run only).
 
 Serves a single-page UI on 127.0.0.1:8791 (or the next free port). Reads data/decisions.jsonl and can
 trigger exactly one dry-run cycle via `.venv/bin/python desk.py --pump` (subprocess; desk.py never places
@@ -24,7 +24,7 @@ if not PY.exists():
     PY = Path(sys.executable)
 HTML = Path(__file__).resolve().parent / "index.html"
 HOST = "127.0.0.1"
-BASE_PORT = int(os.environ.get("JEV_DASH_PORT", "8791"))
+BASE_PORT = int(os.environ.get("CAPSULE_DASH_PORT") or os.environ.get("JEV_DASH_PORT") or "8791")
 RUN_LOCK = threading.Lock()
 RUN_TIMEOUT_S = 90
 
@@ -49,16 +49,41 @@ def read_rows(n: int | None = None) -> list[dict]:
     return rows[-n:] if n else rows
 
 
+def _intent(row: dict) -> dict:
+    return row.get("intent") or row.get("decision") or {}
+
+
+def dashboard_row(row: dict) -> dict:
+    """Expose v1 Decision fields plus the legacy `decision` view the UI already reads."""
+    out = dict(row)
+    intent = _intent(out)
+    gates = out.get("gates")
+    if isinstance(gates, list):
+        gate_map = {g.get("name"): bool(g.get("passed")) for g in gates if isinstance(g, dict)}
+    else:
+        gate_map = (out.get("decision") or {}).get("gates") or {}
+    out.setdefault("decision", {
+        "action": intent.get("action"),
+        "reason": intent.get("reason"),
+        "risk_usd": intent.get("risk_usd"),
+        "take_usd": intent.get("take_usd"),
+        "gates": gate_map,
+    })
+    if "judgment_ms" in out and "jev_ms" not in out:
+        out["jev_ms"] = out["judgment_ms"]
+    return out
+
+
 def summarize(row: dict) -> dict:
     snap = row.get("snapshot") or {}
     coin = snap.get("coin") or {}
-    dec = row.get("decision") or {}
+    dec = _intent(row)
     j = row.get("judgment") or {}
     return {
         "ts": row.get("ts"),
         "symbol": snap.get("symbol"),
         "name": coin.get("name"),
-        "mint": coin.get("mint") or snap.get("mint"),
+        "mint": coin.get("mint") or snap.get("mint") or row.get("mint"),
         "mid_usd": (snap.get("price") or {}).get("last_usd") or (snap.get("price") or {}).get("mid"),
         "mcap_usd": coin.get("market_cap_usd"),
         "regime": j.get("regime"),
@@ -95,7 +120,7 @@ def run_dry_cycle() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "JevDesk/1.0"
+    server_version = "Capsule/1.0"
 
     def log_message(self, fmt, *args):  # quiet, no headers/env
         sys.stderr.write("%s %s\n" % (self.log_date_time_string(), fmt % args))
@@ -117,7 +142,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, HTML.read_bytes(), "text/html; charset=utf-8")
         elif path == "/api/latest":
             rows = read_rows(1)
-            self._json({"row": rows[-1] if rows else None, "running": RUN_LOCK.locked()})
+            row = dashboard_row(rows[-1]) if rows else None
+            self._json({"row": row, "running": RUN_LOCK.locked()})
         elif path == "/api/logs":
             self._json({"rows": [summarize(r) for r in reversed(read_rows(10))]})
         elif path == "/healthz":
@@ -155,7 +181,7 @@ def main():
     httpd = ThreadingHTTPServer((HOST, port), Handler)
     url = f"http://{HOST}:{port}/"
     (Path(__file__).resolve().parent / "url.txt").write_text(url + "\n")
-    print(f"Jev desk dashboard (dry-run) at {url}", flush=True)
+    print(f"Capsule dashboard (dry-run) at {url}", flush=True)
     httpd.serve_forever()
 
 
