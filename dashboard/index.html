@@ -336,7 +336,7 @@
   <a class="hdr-link" href="https://x.com/0xPliny" target="_blank" rel="noopener noreferrer" title="Tips on X">Tips</a>
   <a class="hdr-link" href="https://github.com/0xPliny/Capsule" target="_blank" rel="noopener noreferrer">GitHub</a>
   <a class="hdr-link" href="https://x.com/0xPliny" target="_blank" rel="noopener noreferrer">X</a>
-  <span id="status"></span>
+  <span id="status" title=""></span>
   <button id="run" type="button">Run dry-run</button>
 </header>
 
@@ -1784,6 +1784,7 @@ $("#run").addEventListener("click", async () => {
 });
 
 drawMesh(); drawEdges(); bootSpider(); startDust();
+setStatus($("#status").textContent);
 refresh(true);
 setInterval(() => refresh(false), 15000);
 </script>
