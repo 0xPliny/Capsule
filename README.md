@@ -22,7 +22,7 @@
 
 </div>
 
-**Capsule** is a local pump.fun desk: public market data in, gated judgment out, a paper graph and a quiet capsule mascot on screen. Deterministic code owns math and risk; optional [TypeSafe](https://typesafe.ai) / Jev calls own the six judgment questions. Fan tool that pays respects to Pump — **not affiliated with, endorsed by, or part of Pump**.
+**Capsule** is a local pump.fun desk: public market data in, gated judgment out, a paper graph and a roaming capsule spider on screen. Deterministic code owns math and risk; optional [TypeSafe](https://typesafe.ai) / Jev calls own the six judgment questions. Fan tool that pays respects to Pump — **not affiliated with, endorsed by, or part of Pump**.
 
 ---
 
@@ -31,7 +31,7 @@
 - **Dry-run by design** — no wallet, no trade POSTs, `live_order` is always `false`
 - **Public pump.fun data** — coins, trades, and 1m candles over plain GETs
 - **Offline demo + replay** — `--demo` and `--replay` never need pump.fun or TypeSafe
-- **Paper desk tour** — coin → judgment → gates → action, with a quiet capsule mascot
+- **Paper desk tour** — coin → judgment → gates → action, with a roaming capsule spider
 - **Gate strands** — green PASS / red FAIL on flow, quote environment, liquidity, inventory, and holder cluster, each with its own reason
 - **Holder cluster (paper)** — linked holders, shared funder, and same-block buys. `holder_risk.verdict` is `OK`, `RISKY`, or `DANGER` only after a finished read. `OK` means no elevated cluster, not a buy clearance. Missing rows set `state` to `error` and omit the verdict. Demo / try-sample logs are tagged `SAMPLE`
 - **Evidence panel** — per gate: source, endpoint, fetch time, decision time, snapshot hash, field, threshold, value, distance to the line, and what would flip it
