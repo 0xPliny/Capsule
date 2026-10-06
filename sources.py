@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import math
+import socket
 import statistics
 import time
 import urllib.error
@@ -19,6 +20,8 @@ PUMP_FRONTEND = "https://frontend-api-v3.pump.fun"
 PUMP_SWAP = "https://swap-api.pump.fun"
 UA = {"User-Agent": "Mozilla/5.0 (Capsule dry-run)", "Accept": "application/json"}
 INITIAL_REAL_TOKEN_RESERVES = 793_100_000 * 10**6  # pump.fun bonding curve sellable supply (raw units)
+# Last trade older than this is not fresh enough for a paper intent.
+STALE_AFTER_S = 900
 
 LEGACY_GATE_NAMES = {
     "toxic_flow<0.55": "toxic_flow",
@@ -37,10 +40,75 @@ class SnapshotSource(Protocol):
         """Return (snapshot, judgment_or_None). None = caller decides whether to ask."""
 
 
+class FetchError(Exception):
+    """A public GET that did not return a usable payload."""
+
+    def __init__(self, kind: str, endpoint: str, detail: str, endpoints: list | None = None):
+        super().__init__(f"{kind}: {endpoint}: {detail}")
+        self.kind = kind  # timeout | http | error
+        self.endpoint = endpoint
+        self.detail = detail
+        self.endpoints = endpoints or []
+
+
+def _urlerror_kind(exc: urllib.error.URLError) -> str:
+    reason = exc.reason
+    text = str(reason).lower()
+    if isinstance(reason, (TimeoutError, socket.timeout)) or "timed out" in text:
+        return "timeout"
+    return "error"
+
+
 def _get_json(url: str, timeout: float = 10.0):
     req = urllib.request.Request(url, headers=UA, method="GET")
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except TimeoutError as e:
+        raise FetchError("timeout", url, str(e) or "timed out") from e
+    except urllib.error.HTTPError as e:
+        raise FetchError("http", url, f"HTTP {e.code}") from e
+    except urllib.error.URLError as e:
+        raise FetchError(_urlerror_kind(e), url, str(e.reason)) from e
+
+
+def _endpoint(name: str, url: str, ok: bool, error: str | None, fetched_at: str) -> dict:
+    return {"name": name, "url": url, "ok": ok, "error": error, "fetched_at": fetched_at}
+
+
+def _capture(endpoints: list, name: str, url: str, timeout: float = 10.0):
+    fetched_at = datetime.now(timezone.utc).isoformat()
+    try:
+        data = _get_json(url, timeout=timeout)
+    except FetchError as e:
+        endpoints.append(_endpoint(name, url, False, e.kind, fetched_at))
+        e.endpoints = list(endpoints)
+        raise
+    endpoints.append(_endpoint(name, url, True, None, fetched_at))
+    return data
+
+
+def insufficient_snapshot(source_id: str, failure: FetchError) -> dict:
+    """Snapshot that names the GET which failed. No market fields to mistake for data."""
+    now = datetime.now(timezone.utc).isoformat()
+    endpoints = list(failure.endpoints) or [
+        _endpoint(source_id, failure.endpoint, False, failure.kind, now)
+    ]
+    return {
+        "ts": now,
+        "source": source_id,
+        "source_id": source_id,
+        "fetch_error": f"{failure.kind}: {failure.endpoint}: {failure.detail}",
+        "fetch_failure": {
+            "kind": failure.kind,
+            "endpoint": failure.endpoint,
+            "detail": failure.detail,
+        },
+        "endpoints": endpoints,
+        "mode": "dry_run",
+        "max_risk_usd": 200,
+        "take_usd": 400,
+    }
 
 
 def _f(x, default=None):
@@ -91,7 +159,10 @@ class DemoSource:
     name = "demo"
 
     def load(self) -> tuple[dict, dict | None]:
-        return demo_snapshot(), demo_judgment()
+        snap = demo_snapshot()
+        snap["source_id"] = "demo"
+        snap["endpoints"] = [_endpoint("demo", None, True, None, snap["ts"])]
+        return snap, demo_judgment()
 
 
 class PumpSource:
@@ -102,7 +173,15 @@ class PumpSource:
         self.name = "mint" if mint else "pump"
 
     def load(self) -> tuple[dict, dict | None]:
-        return pump_snapshot(self.mint), None
+        try:
+            snap = pump_snapshot(self.mint, source_id=self.name)
+        except FetchError as e:
+            return insufficient_snapshot(self.name, e), {"error": str(e)}
+        unusable = (snap.get("freshness") or {}).get("stale") or snap.get("missing_fields")
+        if unusable:
+            # Do not ask TypeSafe to invent a judgment on a print we will not trust.
+            return snap, {"error": "market snapshot not usable"}
+        return snap, None
 
 
 class ReplaySource:
@@ -115,40 +194,58 @@ class ReplaySource:
 
     def load(self) -> tuple[dict, dict | None]:
         row = load_replay(self.path)
-        snap = row["snapshot"]
+        snap = dict(row["snapshot"])
+        snap.setdefault("source_id", "replay")
+        snap.setdefault("endpoints", [
+            _endpoint("replay", str(self.path), True, None, snap.get("ts") or row.get("ts") or ""),
+        ])
         judgment = row.get("judgment")
         if judgment is None:
             judgment = {"error": "replay has no judgment; TypeSafe is not called offline"}
         return snap, judgment
 
 
-def pick_active_mint() -> str:
+def pick_active_mint(endpoints: list | None = None) -> str:
     """Most recently traded coin still on the bonding curve (not graduated, not nsfw)."""
     q = urllib.parse.urlencode(
         {"offset": 0, "limit": 50, "sort": "last_trade_timestamp", "order": "DESC", "includeNsfw": "false"}
     )
-    coins = _get_json(f"{PUMP_FRONTEND}/coins?{q}")
+    url = f"{PUMP_FRONTEND}/coins?{q}"
+    if endpoints is None:
+        coins = _get_json(url)
+    else:
+        coins = _capture(endpoints, "coins", url)
     for c in coins:
         if not c.get("complete") and not c.get("nsfw") and not c.get("is_banned"):
             return c["mint"]
     if not coins:
-        raise RuntimeError("pump.fun coin list empty")
+        raise FetchError("error", url, "pump.fun coin list empty", endpoints)
     return coins[0]["mint"]
 
 
-def pump_snapshot(mint: str | None = None) -> dict:
+def pump_snapshot(mint: str | None = None, source_id: str = "pump") -> dict:
     """Compact snapshot in the same shape as demo_snapshot(), built from pump.fun public data.
 
     pump.fun is a constant-product bonding curve (or PumpSwap AMM after graduation), not a CLOB, so
     "book" fields are curve equivalents: depth = quote needed to move price 2%, spread_bps = round-trip
     price impact of a $100 clip, imbalance = buy/sell USD imbalance of recent trades.
     """
-    mint = mint or pick_active_mint()
-    coin = _get_json(f"{PUMP_FRONTEND}/coins-v2/{mint}")
-    trades = _get_json(f"{PUMP_SWAP}/v2/coins/{mint}/trades?limit=100&cursor=0&minSolAmount=0").get("trades", [])
+    endpoints: list = []
+    mint = mint or pick_active_mint(endpoints)
+    coin_url = f"{PUMP_FRONTEND}/coins-v2/{mint}"
+    trades_url = f"{PUMP_SWAP}/v2/coins/{mint}/trades?limit=100&cursor=0&minSolAmount=0"
+    candles_url = f"{PUMP_SWAP}/v1/coins/{mint}/candles?interval=1m&limit=60&currency=USD"
+    coin = _capture(endpoints, "coins-v2", coin_url)
+    trades_doc = _capture(endpoints, "trades", trades_url)
+    trades = trades_doc.get("trades", []) if isinstance(trades_doc, dict) else []
+    # Candles fill returns only. HTTP miss is recorded and tolerated; a timeout is not.
     try:
-        candles = _get_json(f"{PUMP_SWAP}/v1/coins/{mint}/candles?interval=1m&limit=60&currency=USD")
-    except urllib.error.HTTPError:
+        candles = _capture(endpoints, "candles", candles_url)
+        if not isinstance(candles, list):
+            candles = []
+    except FetchError as e:
+        if e.kind == "timeout":
+            raise
         candles = []
 
     now_ms = time.time() * 1000
@@ -190,9 +287,45 @@ def pump_snapshot(mint: str | None = None) -> dict:
     vol_med = round(statistics.pstdev(rets[-30:]), 5) if len(rets) >= 2 else None
     vol_1m_usd = sum(_f(c.get("volume"), 0) for c in candles[-5:]) if candles else None
 
+    if coin.get("last_trade_timestamp") is None:
+        last_trade_age = None
+    else:
+        last_trade_age = round((now_ms - _f(coin.get("last_trade_timestamp"), now_ms)) / 1000, 1)
+    missing = []
+    if not mint:
+        missing.append("coin.mint")
+    if last_px is None:
+        missing.append("price.last_usd")
+    if not trades:
+        missing.append("trades")
+    if last_trade_age is None:
+        freshness = {
+            "stale": True,
+            "stale_after_s": STALE_AFTER_S,
+            "last_trade_age_s": None,
+            "endpoint": coin_url,
+            "detail": "missing last_trade_timestamp",
+        }
+    elif last_trade_age > STALE_AFTER_S:
+        freshness = {
+            "stale": True,
+            "stale_after_s": STALE_AFTER_S,
+            "last_trade_age_s": last_trade_age,
+            "endpoint": coin_url,
+            "detail": f"stale last_trade_age_s={last_trade_age} > {STALE_AFTER_S}",
+        }
+    else:
+        freshness = {
+            "stale": False,
+            "stale_after_s": STALE_AFTER_S,
+            "last_trade_age_s": last_trade_age,
+            "endpoint": coin_url,
+        }
+
     return {
         "ts": datetime.now(timezone.utc).isoformat(),
         "source": "pump.fun public API (frontend-api-v3 coins-v2, swap-api trades+candles)",
+        "source_id": source_id,
         "venue": "pumpswap_amm" if complete else "pump_bonding_curve",
         "symbol": coin.get("symbol"),
         "coin": {
@@ -205,7 +338,7 @@ def pump_snapshot(mint: str | None = None) -> dict:
             "curve_progress": curve_progress,
             "reply_count": coin.get("reply_count"),
             "has_socials": bool(coin.get("twitter") or coin.get("telegram") or coin.get("website")),
-            "last_trade_age_s": round((now_ms - _f(coin.get("last_trade_timestamp"), now_ms)) / 1000, 1),
+            "last_trade_age_s": last_trade_age,
         },
         "price": {"last_usd": last_px, "ret_1m": ret(1), "ret_5m": ret(5), "ret_30m": ret(30)},
         "book": {
@@ -229,6 +362,9 @@ def pump_snapshot(mint: str | None = None) -> dict:
         "mode": "dry_run",
         "max_risk_usd": 200,
         "take_usd": 400,
+        "endpoints": endpoints,
+        "freshness": freshness,
+        "missing_fields": missing,
     }
 
 

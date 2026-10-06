@@ -51,7 +51,7 @@ def test_replay_each_intent_path(demo_snapshot, passing_judgment):
 
 def test_load_replay_jsonl(fixtures_dir):
     row = load_replay(fixtures_dir / "replay_paper_long.jsonl")
-    assert row["schema_v"] == SCHEMA_V
+    assert row["schema_v"] == 1
     assert row["intent"]["action"] == "paper_long"
     again = decide(row["snapshot"], row["judgment"])
     assert again["intent"]["action"] == "paper_long"
@@ -121,7 +121,7 @@ def test_cli_demo_offline():
     assert p.returncode == 0, p.stderr
     assert "paper_long" in p.stdout
     assert '"live_order": false' in p.stdout
-    assert '"schema_v": 1' in p.stdout
+    assert '"schema_v": 2' in p.stdout
 
 
 def test_cli_replay_offline(fixtures_dir):

@@ -6,6 +6,7 @@ Read-only public GETs only (no keys for market data, no trade POSTs). live_order
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import time
@@ -18,7 +19,13 @@ from sources import DemoSource, PumpSource, ReplaySource
 
 ROOT = Path(__file__).resolve().parent
 LOG = ROOT / "data" / "decisions.jsonl"
-SCHEMA_V = 1
+SCHEMA_V = 2
+
+
+def canonical_hash(obj: dict) -> str:
+    """sha256 of canonical JSON. Key order does not change the digest."""
+    payload = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def ask_judgment(snapshot: dict) -> dict:
@@ -93,16 +100,33 @@ def build_record(
     run_id: str | None = None,
 ) -> dict:
     mint = ((snapshot.get("coin") or {}).get("mint") or snapshot.get("mint"))
+    decided_at = datetime.now(timezone.utc).isoformat()
+    snap_hash = canonical_hash(snapshot)
+    fetched_at = snapshot.get("ts")
+    endpoints = snapshot.get("endpoints") or [
+        {"name": source, "url": None, "ok": not snapshot.get("fetch_error"), "error": snapshot.get("fetch_error"),
+         "fetched_at": fetched_at}
+    ]
+    gates = []
+    for gate in decided["gates"]:
+        stamped = dict(gate)
+        stamped["snapshot_hash"] = snap_hash
+        stamped["fetched_at"] = fetched_at
+        stamped["decided_at"] = decided_at
+        gates.append(stamped)
     return {
         "schema_v": SCHEMA_V,
         "run_id": run_id or uuid.uuid4().hex,
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": decided_at,
         "source": source,
         "mint": mint,
         "snapshot": snapshot,
+        "snapshot_hash": snap_hash,
+        "endpoints": endpoints,
         "judgment": judgment,
-        "gates": decided["gates"],
+        "gates": gates,
         "intent": decided["intent"],
+        "data_status": decided.get("data_status", "ok"),
         "threshold_set_id": decided["threshold_set_id"],
         "live_order": False,
         "elapsed_ms": elapsed_ms,
@@ -122,12 +146,19 @@ def run_cycle(source) -> dict:
     try:
         snap, judgment = source.load()
     except Exception as e:
+        name = getattr(source, "name", "unknown")
+        detail = f"{type(e).__name__}: {e}"
+        now = datetime.now(timezone.utc).isoformat()
         snap = {
-            "ts": datetime.now(timezone.utc).isoformat(),
-            "source": getattr(source, "name", "unknown"),
-            "fetch_error": f"{type(e).__name__}: {e}",
+            "ts": now,
+            "source": name,
+            "source_id": name,
+            "fetch_error": detail,
+            "fetch_failure": {"kind": "error", "endpoint": name, "detail": detail},
+            "endpoints": [{"name": name, "url": None, "ok": False, "error": "error", "fetched_at": now}],
+            "mode": "dry_run",
         }
-        judgment = {"error": f"snapshot fetch failed: {snap['fetch_error']}"}
+        judgment = {"error": detail}
     fetch_ms = round((time.time() - t0) * 1000, 1)
 
     if judgment is None:
