@@ -306,6 +306,8 @@
     .hud.br { left:12px; right:12px; bottom:10px; width:auto; max-width:none; text-align:left; }
     #prog { width:88px; }
     #bubble { max-width:min(200px, 54%); }
+    /* Option A: smaller spider so the in-stage lane between HUD bands can clear the legend. */
+    #pet-svg { transform:scale(0.85); transform-origin:center; }
     .holder-ca { min-width:0; flex:1 1 100%; max-width:none; }
     #evidence { grid-template-columns:1fr; }
   }
@@ -784,21 +786,14 @@ function holderPaused() {
   return v === "RISKY" || v === "DANGER";
 }
 function roamBounds() {
+  const lane = hudLane();
+  if (lane) return lane;
   const header = document.querySelector("header").getBoundingClientRect();
   const inset = 12, half = 64;
-  let minY = Math.max(header.bottom + 8, inset) + half;
-  let maxY = Math.max(minY + 48, innerHeight - inset - half);
-  let minX = inset + half;
-  let maxX = Math.max(minX + 48, innerWidth - inset - half);
-  const lane = hudLane();
-  if (lane) {
-    minX = Math.max(minX, lane.minX);
-    maxX = Math.min(maxX, lane.maxX);
-    minY = Math.max(minY, lane.minY);
-    maxY = Math.min(maxY, lane.maxY);
-    if (maxX < minX + 8) maxX = minX + 8;
-    if (maxY < minY + 8) maxY = minY + 8;
-  }
+  const minY = Math.max(header.bottom + 8, inset) + half;
+  const maxY = Math.max(minY + 48, innerHeight - inset - half);
+  const minX = inset + half;
+  const maxX = Math.max(minX + 48, innerWidth - inset - half);
   return { minX, maxX, minY, maxY };
 }
 function avoidRects() {
@@ -821,7 +816,7 @@ function avoidRects() {
   return out;
 }
 function hitsAvoid(x, y, pad) {
-  const half = 70 + (pad || 0);
+  const half = (innerWidth <= 640 ? narrowReach() : 70) + (pad || 0);
   const s = {l: x - half, t: y - half, r: x + half, b: y + half};
   for (const a of avoidRects()) {
     if (s.r > a.l && s.l < a.r && s.b > a.t && s.t < a.b) return true;
@@ -838,47 +833,96 @@ function boxHits(x, y, rects, half) {
   const s = {l: x - half, t: y - half, r: x + half, b: y + half};
   return rects.some((a) => s.r > a.l && s.l < a.r && s.b > a.t && s.t < a.b);
 }
+// Open band inside #stage, between the top HUD and any full-width bottom HUD.
+function stageHudGap() {
+  const stage = $("#stage").getBoundingClientRect();
+  let top = stage.top, bot = stage.bottom;
+  if (stage.width < 40 || stage.height < 40) return {stage, top, bot};
+  for (const h of hudRects()) {
+    const mid = (h.t + h.b) / 2;
+    if (mid < stage.top + stage.height * 0.5) top = Math.max(top, h.b);
+    else if (h.w > stage.width * 0.65) bot = Math.min(bot, h.t);
+  }
+  return {stage, top, bot};
+}
+// At <=640 the spider is scale 0.85. Reach is the scaled leg radius plus walk-bob
+// pad, shrunk only if that is the only way to keep a lane inside the stage.
+function narrowReach() {
+  const want = 58;
+  const {stage, top, bot} = stageHudGap();
+  const vFit = Math.floor((bot - top - 16) / 2);
+  const hFit = Math.floor((stage.right - stage.left - 16) / 2);
+  if (!isFinite(vFit) || !isFinite(hFit)) return want;
+  return Math.max(28, Math.min(want, vFit, hFit));
+}
 // At <=640 the stage legend is full width, so a straight roam between stops cuts it.
-// Sample the whole segment, not just the stops, and keep the lane off .hud.
+// Sample the whole segment, not just the stops, and keep the lane inside #stage.
 function segmentHitsHud(a, b) {
   if (!a || !b || innerWidth > 640) return false;
   const rects = hudRects();
   if (!rects.length) return false;
+  const half = narrowReach();
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
   const steps = Math.max(1, Math.ceil(dist / 8));
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
-    if (boxHits(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, rects, 74)) return true;
+    if (boxHits(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, rects, half)) return true;
   }
   return false;
 }
 function hudLane() {
   if (innerWidth > 640) return null;
-  const stage = $("#stage").getBoundingClientRect();
+  const {stage, top, bot} = stageHudGap();
   if (stage.width < 40 || stage.height < 40) return null;
-  const reach = 76;
-  let minY = stage.top + 8;
-  let maxY = stage.bottom - 8;
-  for (const h of hudRects()) {
-    const mid = (h.t + h.b) / 2;
-    if (mid < stage.top + stage.height * 0.5) minY = Math.max(minY, h.b + reach);
-    else if (h.w > stage.width * 0.65) maxY = Math.min(maxY, h.t - reach);
+  const reach = narrowReach();
+  // hudRects are already padded 4px; avoidRects pad HUD by 6px. Stay inside #stage.
+  const pad = 2;
+  let minX = stage.left + reach;
+  let maxX = stage.right - reach;
+  let minY = top + reach + pad;
+  let maxY = bot - reach - pad;
+  const cap = $("#bubble");
+  if (cap && cap.classList.contains("show")) {
+    const r = cap.getBoundingClientRect();
+    if (r.width > 2 && r.height > 2 && r.bottom > minY && r.top < maxY) {
+      const gutter = reach + 6;
+      const leftRoom = r.left - gutter - minX;
+      const rightRoom = maxX - (r.right + gutter);
+      if (rightRoom >= leftRoom) minX = Math.max(minX, r.right + gutter);
+      else maxX = Math.min(maxX, r.left - gutter);
+    }
   }
-  if (maxY - minY < 8) {
-    // No gap between the top HUD and the full-width legend. Roam under the stage.
-    const floor = stage.bottom + reach;
-    return {minX: reach, maxX: innerWidth - reach, minY: floor, maxY: Math.max(floor + 36, innerHeight - reach)};
+  const loX = stage.left + reach, hiX = Math.max(loX, stage.right - reach);
+  const loY = top + reach + pad, hiY = Math.max(loY, bot - reach - pad);
+  minX = Math.max(loX, Math.min(minX, hiX));
+  maxX = Math.max(loX, Math.min(maxX, hiX));
+  minY = Math.max(loY, Math.min(minY, hiY));
+  maxY = Math.max(loY, Math.min(maxY, hiY));
+  if (maxX < minX) { minX = loX; maxX = hiX; }
+  if (maxY < minY) { minY = loY; maxY = hiY; }
+  return {minX, maxX, minY, maxY};
+}
+function pickStageWaypoint(b) {
+  const spanX = Math.max(0, b.maxX - b.minX);
+  const spanY = Math.max(0, b.maxY - b.minY);
+  const minStep = Math.min(48, Math.max(16, spanX * 0.4));
+  for (let n = 0; n < 12; n++) {
+    const p = {x: b.minX + Math.random() * spanX, y: b.minY + Math.random() * spanY};
+    if (hitsAvoid(p.x, p.y, 0) || segmentHitsHud({x: PET.x, y: PET.y}, p)) continue;
+    if (Math.hypot(p.x - PET.x, p.y - PET.y) >= minStep) return p;
   }
-  return {minX: stage.left + 8, maxX: stage.right - 8, minY, maxY};
+  const mid = {x: b.minX + spanX / 2, y: b.minY + spanY / 2};
+  if (!hitsAvoid(mid.x, mid.y, 0) && !segmentHitsHud({x: PET.x, y: PET.y}, mid)) return mid;
+  return {x: clamp(PET.x, b.minX, b.maxX), y: clamp(PET.y, b.minY, b.maxY)};
 }
 function parkSpot() {
   const b = roamBounds();
+  if (innerWidth <= 640) return pickStageWaypoint(b);
   const stage = $("#stage").getBoundingClientRect();
-  const narrow = innerWidth <= 640;
   const spots = [];
   if (stage.width > 40) {
-    const xs = narrow ? [0.78, 0.7, 0.5] : [0.78, 0.62, 0.4];
-    const ys = narrow ? [0.4, 0.34, 0.48] : [0.4, 0.52, 0.3];
+    const xs = [0.78, 0.62, 0.4];
+    const ys = [0.4, 0.52, 0.3];
     for (const xk of xs) for (const yk of ys) {
       spots.push({x: stage.left + stage.width * xk, y: stage.top + stage.height * yk});
     }
@@ -889,7 +933,7 @@ function parkSpot() {
     const y = clamp(s.y, b.minY, b.maxY);
     if (!hitsAvoid(x, y, 0)) return {x, y};
   }
-  return {x: clamp((narrow ? b.maxX - 10 : (b.minX + b.maxX) / 2), b.minX, b.maxX), y: clamp(b.minY + 28, b.minY, b.maxY)};
+  return {x: clamp((b.minX + b.maxX) / 2, b.minX, b.maxX), y: clamp(b.minY + 28, b.minY, b.maxY)};
 }
 let spiderSettled = false;
 function settleOffChrome() {
@@ -973,6 +1017,7 @@ function snapFoot(l, ideal) {
 }
 function pickWaypoint(first) {
   const b = roamBounds();
+  if (innerWidth <= 640) return pickStageWaypoint(b);
   if (first) {
     const ang = Math.random() * Math.PI * 2;
     const dist = 100 + Math.random() * 36;
