@@ -18,7 +18,13 @@
 
 ---
 
-[![Capsule dry-run desk](docs/capsule-desk.png)](https://github.com/0xPliny/Capsule)
+<img src="docs/capsule-desk.png" alt="Capsule paper desk in dry-run mode. No wallet, no orders." width="1440" />
+
+Capsule paper desk in dry-run mode. No wallet, no orders.
+
+<img src="docs/capsule-holder-strip.png" alt="Holder risk strip (paper scan). Read-only public data." width="1100" />
+
+Holder risk strip (paper scan). Read-only public data.
 
 </div>
 
@@ -122,10 +128,6 @@ This release is still a dry-run. It does **not** connect a key, does **not** pos
 | Paper scoreboard | Entry price and time at the decision; the N-minute print records the paper delta. Missing prices stay insufficient |
 | Evidence roles | observed / derived / cited on the numbers the gates already show |
 | Honesty strip | **DRY RUN · PAPER** stays in the header, tips stay on [x.com/0xPliny](https://x.com/0xPliny), and the not-affiliated line stays |
-
-<p align="center">
-  <img src="docs/capsule-mascot.png" alt="Capsule mascot poses" width="440" />
-</p>
 
 ---
 
