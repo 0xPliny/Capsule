@@ -1,0 +1,9 @@
+{
+  "id": "default_v1",
+  "gates": [
+    {"name": "inventory", "field": "inventory", "op": "lt", "threshold": 1.5, "order": 1},
+    {"name": "toxic_flow", "field": "toxic_flow", "op": "lt", "threshold": 0.55, "order": 2},
+    {"name": "quote_env", "field": "quote_env", "op": "ge", "threshold": 0.55, "order": 3},
+    {"name": "liquidity", "field": "liquidity", "op": "ge", "threshold": 1.0, "order": 4}
+  ]
+}

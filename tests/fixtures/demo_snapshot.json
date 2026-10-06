@@ -1,0 +1,15 @@
+{
+  "ts": "2026-10-06T00:00:00+00:00",
+  "source": "demo",
+  "symbol": "DEMO-PERP",
+  "price": {"mid": 100.0, "microprice": 100.02, "ret_1m": 0.001, "ret_5m": -0.002, "ret_30m": 0.004},
+  "book": {"spread_bps": 2.5, "depth_3": 12000, "imbalance": 0.12, "queue_pos": 3},
+  "flow": {"agg_buy": 4100, "agg_sell": 3800, "trade_intensity": 1.2, "cancel_intensity": 0.8},
+  "vol": {"short": 0.18, "medium": 0.22, "vs_24h": "normal"},
+  "cross": {"basis_bps": 1.0, "funding": 0.0001},
+  "book_pnl": {"inventory": 0.0, "unrealized": 0.0, "drawdown": 0.0, "position_age_s": 0},
+  "health": {"fill_ratio": 0.0, "reject_rate": 0.0, "slippage_bps": 0.0},
+  "mode": "dry_run",
+  "max_risk_usd": 200,
+  "take_usd": 400
+}
