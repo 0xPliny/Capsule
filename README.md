@@ -12,7 +12,7 @@
 
 ### A live, visual dry-run desk for [pump.fun](https://pump.fun)
 
-`status` &nbsp;🟢 **Shipping** &nbsp;&nbsp; `version` &nbsp;📦 **0.2.0** &nbsp;&nbsp; `license` &nbsp;📄 **Apache-2.0** &nbsp;&nbsp; `mode` &nbsp;🧪 **Dry-run only**
+`status` &nbsp;🟢 **Shipping** &nbsp;&nbsp; `version` &nbsp;📦 **0.3.0** &nbsp;&nbsp; `license` &nbsp;📄 **Apache-2.0** &nbsp;&nbsp; `mode` &nbsp;🧪 **Dry-run only**
 
 ### Built by **[0xPliny](https://x.com/0xPliny)** · tips welcome on X
 
@@ -32,7 +32,9 @@
 - **Public pump.fun data** — coins, trades, and 1m candles over plain GETs
 - **Offline demo + replay** — `--demo` and `--replay` never need pump.fun or TypeSafe
 - **Paper desk tour** — coin → judgment → gates → action, with a quiet capsule mascot
-- **Gate strands** — green PASS / red FAIL on toxic flow, quote environment, liquidity, inventory
+- **Gate strands** — green PASS / red FAIL on toxic flow, quote environment, liquidity, inventory, each with its own reason
+- **Evidence panel** — per gate: source, endpoint, fetch time, decision time, snapshot hash, field, threshold, value, distance to the line, and what would flip it
+- **Fail closed** — a failed GET, a timeout, a stale print, or a missing field does not produce a confident intent. The desk says **insufficient data** and names the source and endpoint
 - **CA → pump.fun** — mint links open the coin page when a mint is present
 - **Header actions** — [Tips](https://x.com/0xPliny) · [GitHub](https://github.com/0xPliny/Capsule) · [X](https://x.com/0xPliny)
 - **Apache-2.0** — use it, fork it, build on it; keep secrets out of the repo
@@ -60,15 +62,24 @@ python dashboard/server.py         # local UI at http://127.0.0.1:8791/
 
 The dashboard binds **127.0.0.1 only**, default port **8791** (next free port if 8791 is taken). Override with `CAPSULE_DASH_PORT`.
 
-Open the printed URL → **Run dry-run**. Watch Capsule crawl the graph.
+Open the printed URL → **Run dry-run**. Watch Capsule crawl the graph. **DRY RUN · PAPER** stays in the header.
 
-Windows `run.bat` is not in this repo yet — use the commands above.
+### Windows
+
+`run.bat` starts the same local dashboard. It uses `.venv\Scripts\python.exe` when that file exists, otherwise `py -3`, otherwise `python`.
+
+```bat
+run.bat
+set CAPSULE_DASH_PORT=8791 && run.bat
+```
+
+The script does not take a trade, does not read a key, and does not listen on anything but localhost. The port is `8791` unless `CAPSULE_DASH_PORT` is already set.
 
 ### What “I need to…” maps to
 
 | I need to… | Start here |
 | --- | --- |
-| See the desk UI | `python dashboard/server.py` |
+| See the desk UI | `python dashboard/server.py` or `run.bat` on Windows |
 | Score the latest curve coin | `python desk.py --pump` |
 | Score a mint I already have | `python desk.py --mint <MINT>` |
 | Demo with no network / no API key | `python desk.py --demo` |
@@ -82,8 +93,9 @@ Windows `run.bat` is not in this repo yet — use the commands above.
 
 1. Build a compact market snapshot from a **source**: live pump.fun GETs (`--pump` / `--mint`), the offline demo, or a recorded file (`--replay`).
 2. Ask six questions (live TypeSafe / Jev on `--pump` / `--mint`; canned or stored judgment offline): regime, direction, toxic flow, liquidity, quote environment, inventory.
-3. Evaluate **all** declarative gates from `thresholds.json` (`default_v1`), then apply intent policy: inventory → toxic → quote_env → liquidity → direction → `paper_long` / `paper_short` / hold / flatten — **never** a live order.
-4. Log a versioned Decision (`schema_v`, `run_id`, `ts`, `source`, `mint`, `snapshot`, `judgment`, per-gate outcomes, `intent`, `threshold_set_id`) to `data/decisions.jsonl` (gitignored) and animate the tour on the dashboard.
+3. Evaluate **all** declarative gates from `thresholds.json` (`default_v1`). Each gate records the field, the threshold, the value, the signed distance to that line, a reason, and what would flip it. Intent policy is still inventory → toxic → quote_env → liquidity → direction → `paper_long` / `paper_short` / hold / flatten — **never** a live order.
+4. If a required GET fails or times out, the coin's last trade is older than 15 minutes (`900s`), or a gate field is missing, the intent is `hold` with `confident: false` and a reason that starts `insufficient data:` and names the source and endpoint. Candle HTTP misses are shown on the evidence panel and do not by themselves block a decision that already has price and trades. A candle timeout does block.
+5. Log a versioned Decision (`schema_v` **2**, `run_id`, `ts`, `source`, `mint`, `snapshot`, `snapshot_hash`, `endpoints`, `judgment`, per-gate evidence, `intent`, `data_status`, `threshold_set_id`) to `data/decisions.jsonl` (gitignored). Older `schema_v` 1 rows still replay. The dashboard lists every gate, not only the first failure.
 
 <p align="center">
   <img src="docs/capsule-mascot.png" alt="Capsule mascot poses" width="440" />
@@ -127,7 +139,7 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
 
 <div align="center">
 
-**Status: Shipping** &nbsp;·&nbsp; **Version 0.2.0** &nbsp;·&nbsp; **Dry-run · live_order false**
+**Status: Shipping** &nbsp;·&nbsp; **Version 0.3.0** &nbsp;·&nbsp; **Dry-run · live_order false**
 
 *Fan desk for pump.fun. Not Pump. Stay safe.*
 

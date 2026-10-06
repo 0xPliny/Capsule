@@ -2,7 +2,7 @@
 """Capsule local dashboard (dry-run only).
 
 Serves a single-page UI on 127.0.0.1:8791 (or the next free port). Reads data/decisions.jsonl and can
-trigger exactly one dry-run cycle via `.venv/bin/python desk.py --pump` (subprocess; desk.py never places
+trigger exactly one dry-run cycle via the project venv (`bin/python` or `Scripts/python.exe`) running `desk.py --pump` (subprocess; desk.py never places
 orders, live_order is always false). This server has no trading code and never sends orders.
 """
 from __future__ import annotations
@@ -19,9 +19,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LOG = ROOT / "data" / "decisions.jsonl"
-PY = ROOT / ".venv" / "bin" / "python"
-if not PY.exists():
-    PY = Path(sys.executable)
+
+
+def resolve_python() -> Path:
+    """Prefer the project venv (Unix or Windows), else this interpreter."""
+    for rel in (".venv/bin/python", ".venv/Scripts/python.exe"):
+        candidate = ROOT / rel
+        if candidate.exists():
+            return candidate
+    return Path(sys.executable)
+
+
+PY = resolve_python()
 HTML = Path(__file__).resolve().parent / "index.html"
 HOST = "127.0.0.1"
 BASE_PORT = int(os.environ.get("CAPSULE_DASH_PORT") or os.environ.get("JEV_DASH_PORT") or "8791")

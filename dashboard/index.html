@@ -147,10 +147,23 @@
   th { color:var(--dim); font-weight:var(--w-strong); }
   td.wrap { white-space:normal; }
   #gates { display:flex; flex-direction:column; gap:8px; }
-  .gate { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px;
+  .gate { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:8px 10px;
           border:1px solid var(--line); border-radius:var(--radius); background:transparent; }
+  .gate-copy { min-width:0; }
   .gate-name { color:var(--text); font-weight:var(--w); }
-  .gate-mark { font-weight:var(--w-strong); font-size:12px; letter-spacing:.04em; padding:3px 8px; border-radius:var(--radius); border:1px solid var(--line); }
+  .gate-reason { color:var(--dim); font-size:12px; font-weight:var(--w); white-space:normal; margin-top:2px; }
+  .gate-mark { font-weight:var(--w-strong); font-size:12px; letter-spacing:.04em; padding:3px 8px; border-radius:var(--radius); border:1px solid var(--line); flex:0 0 auto; }
+  .insuff { border:1px solid var(--bad); border-radius:var(--radius); padding:8px 10px; margin:0 0 10px; color:var(--text); }
+  .insuff strong { color:var(--bad); font-weight:var(--w-strong); }
+  .ev-note { margin:-4px 0 12px; font-size:12px; }
+  #evidence { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px; }
+  .ev { border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; min-width:0; }
+  .ev.pass { border-color:var(--accent); }
+  .ev.fail { border-color:#8C3D38; }
+  .ev h3 { margin:0 0 8px; font-size:13px; font-weight:var(--w-strong); display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .ev .kv { grid-template-columns:88px 1fr; }
+  .ev.pass .gate-mark { color:var(--ink); background:var(--accent); border-color:var(--accent); }
+  .ev.fail .gate-mark { color:#F6E7E4; background:#8C3D38; border-color:#8C3D38; }
   .gate.pass .gate-mark { color:var(--ink); background:var(--accent); border-color:var(--accent); }
   .gate.fail .gate-mark { color:#F6E7E4; background:#8C3D38; border-color:#8C3D38; }
   a.mint-link { color:var(--accent); text-underline-offset:3px; }
@@ -268,8 +281,15 @@
   </section>
   <section class="card c4">
     <h2>Gates & action</h2>
+    <div id="insuff"></div>
     <div id="gates"></div>
     <div style="margin-top:12px" id="action"></div>
+  </section>
+
+  <section class="card c12">
+    <h2>Evidence</h2>
+    <p class="ev-note dim">Each gate names the source, the fetch, the snapshot hash, and how close the value sits to the line.</p>
+    <div id="evidence"></div>
   </section>
 
   <section class="card c12">
@@ -310,12 +330,45 @@ function gateMap(g) {
   return g;
 }
 function rowIntent(row) { return (row && (row.intent || row.decision)) || {}; }
+const OP_SYM = {lt:"<", le:"≤", gt:">", ge:"≥", eq:"=", ne:"≠"};
+function gateEntries(row) {
+  const d = rowIntent(row);
+  const raw = row && row.gates;
+  if (Array.isArray(raw) && raw.length && typeof raw[0] === "object") return raw;
+  const g = gateMap(raw) || gateMap(d.gates) || {};
+  return Object.entries(g).map(([name, passed]) => ({name, field: name, passed: !!passed}));
+}
+function gateLabel(g) {
+  if (!g) return "gate";
+  if (g.field && g.op && g.threshold != null && OP_SYM[g.op]) return `${g.field} ${OP_SYM[g.op]} ${g.threshold}`;
+  return GATE_LABELS[g.name] || g.name || "gate";
+}
+function gateReason(g) {
+  if (!g) return "not evaluated";
+  if (g.reason) return g.reason;
+  if (g.passed == null) return "not evaluated";
+  if (g.value == null && g.field) return `${g.field} missing`;
+  return g.passed ? "passed" : "failed";
+}
+function endpointList(row) {
+  return (row && (row.endpoints || (row.snapshot && row.snapshot.endpoints))) || [];
+}
+function hashText(row, g) {
+  return (g && g.snapshot_hash) || (row && row.snapshot_hash) || "";
+}
 
 function actionClass(a) { if (!a) return "dim"; if (a.startsWith("paper_")) return "ok"; if (a.includes("flatten")) return "bad"; return "warn"; }
 
-// ------------------------------------------------------------- panels (unchanged data)
+// ------------------------------------------------------------- panels
 function renderPanels(row) {
-  if (!row) { $("#coin").innerHTML = "<div>status</div><div>No decisions logged yet. Click Run dry-run.</div>"; return; }
+  if (!row) {
+    $("#coin").innerHTML = "<div>status</div><div>No decisions logged yet. Click Run dry-run.</div>";
+    $("#insuff").innerHTML = "";
+    $("#gates").innerHTML = `<div class="dim">no gates evaluated</div>`;
+    $("#action").innerHTML = "";
+    renderEvidence(null, []);
+    return;
+  }
   const s = row.snapshot || {}, c = s.coin || {}, j = row.judgment || {}, d = rowIntent(row);
   const live = !!row.live_order;
   const lb = $("#live-badge"); lb.textContent = live ? "live_order true" : "orders off"; lb.className = "status-pill" + (live ? " is-bad" : "");
@@ -341,12 +394,62 @@ function renderPanels(row) {
       <tr><td>quote_env</td><td class="mono">${num(j.quote_env)}</td><td class="dim">Noul p</td></tr>
       <tr><td>inventory</td><td class="mono">${num(j.inventory)}</td><td class="dim">${esc(j.inventory_label)}</td></tr></table>`;
   }
-  const g = gateMap(row.gates) || gateMap(d.gates) || {};
-  $("#gates").innerHTML = Object.keys(g).length ? Object.entries(g).map(([k,v]) =>
-    `<div class="gate ${v ? "pass" : "fail"}"><span class="gate-name">${esc(GATE_LABELS[k] || k)}</span><span class="gate-mark">${v ? "PASS" : "FAIL"}</span></div>`).join("")
-    : `<div class="dim">no gates evaluated</div>`;
-  $("#action").innerHTML = `<div class="big ${actionClass(d.action)}">${esc(d.action)}</div>
-    <div class="dim">${esc(d.reason)}</div><div class="dim mono">risk_usd ${esc(d.risk_usd)}</div>`;
+  const entries = gateEntries(row);
+  const insuff = row.data_status === "insufficient" || d.confident === false;
+  $("#insuff").innerHTML = insuff
+    ? `<div class="insuff"><strong>insufficient data</strong><div>${esc(d.reason)}</div></div>`
+    : "";
+  $("#gates").innerHTML = entries.length ? entries.map(g => {
+    const mark = g.passed == null ? "—" : g.passed ? "PASS" : "FAIL";
+    const cls = g.passed == null ? "" : g.passed ? "pass" : "fail";
+    return `<div class="gate ${cls}"><div class="gate-copy"><div class="gate-name">${esc(gateLabel(g))}</div><div class="gate-reason">${esc(gateReason(g))}</div></div><span class="gate-mark">${mark}</span></div>`;
+  }).join("") : `<div class="dim">no gates evaluated</div>`;
+  const actCls = insuff ? "bad" : actionClass(d.action);
+  $("#action").innerHTML = `<div class="big ${actCls}">${esc(insuff ? "insufficient data" : d.action)}</div>
+    <div class="dim">${esc(d.reason)}</div><div class="dim mono">risk_usd ${esc(d.risk_usd)}${d.confident === false ? " · not confident" : d.confident ? " · confident" : ""}</div>`;
+  renderEvidence(row, entries);
+}
+
+function renderEvidence(row, entries) {
+  const box = $("#evidence");
+  if (!box) return;
+  if (!row || !entries.length) {
+    box.innerHTML = `<div class="dim">No gate evidence yet.</div>`;
+    return;
+  }
+  const s = row.snapshot || {};
+  const eps = endpointList(row);
+  box.innerHTML = entries.map(g => {
+    const mark = g.passed == null ? "—" : g.passed ? "PASS" : "FAIL";
+    const cls = g.passed == null ? "" : g.passed ? "pass" : "fail";
+    const op = OP_SYM[g.op] || g.op || "";
+    const threshold = g.threshold == null ? "—" : `${op ? op + " " : ""}${g.threshold}`;
+    const digest = hashText(row, g);
+    const dist = g.distance == null ? "—" : g.distance;
+    const epHtml = eps.length ? `<div>endpoint</div><div class="mono">${eps.map(e => {
+      const where = e.url || e.name || g.endpoint || row.source || "—";
+      const flag = e.ok === false ? `<span class="bad">FAIL ${esc(e.error || "")}</span>` : `<span class="ok">ok</span>`;
+      const name = e.name && e.url ? esc(e.name) + " " : "";
+      return `${name}${esc(where)} ${flag}`;
+    }).join("<br>")}</div>` : `<div>endpoint</div><div class="mono">${esc(g.endpoint || row.source || "—")}</div>`;
+    return `<article class="ev ${cls}">
+      <h3><span>${esc(gateLabel(g))}</span><span class="gate-mark">${mark}</span></h3>
+      <div class="kv">
+        <div>source</div><div class="mono">${esc(g.source_id || row.source || "—")}</div>
+        ${epHtml}
+        <div>fetched</div><div>${esc(tlocal(g.fetched_at || s.ts))}</div>
+        <div>decided</div><div>${esc(tlocal(g.decided_at || row.ts))}</div>
+        <div>snapshot</div><div class="mono">${digest ? esc(digest) : "—"}</div>
+        <div>field</div><div class="mono">${esc(g.field || g.name)}</div>
+        <div>threshold</div><div class="mono">${esc(threshold)}</div>
+        <div>value</div><div class="mono">${g.value == null ? "—" : esc(g.value)}</div>
+        <div>result</div><div class="${cls}">${mark}</div>
+        <div>distance</div><div class="mono">${esc(dist)}</div>
+        <div>flip</div><div>${esc(g.flip || "—")}</div>
+        <div>reason</div><div>${esc(gateReason(g))}</div>
+      </div>
+    </article>`;
+  }).join("");
 }
 
 function renderLogs(rows) {
@@ -620,16 +723,20 @@ function buildStage(row) {
   qs.forEach((q, i) => NODES["q" + i] = pillNode("q" + i, q[0], j.error ? "silent" : q[1], j.error ? "err" : ""));
 
   // gates: each gate feeds a strand into the action node; pass = holds (green), fail = snaps (red)
-  const gk = Object.keys(g).length ? Object.keys(g) : Object.keys(GATE_LABELS);
+  const shown = (row ? gateEntries(row) : []).slice(0, 4);
+  const gateStops = shown.length ? shown : ["inventory", "toxic_flow", "quote_env", "liquidity"].map(name => ({name, passed: null}));
   const ap = POS.action;
-  gk.slice(0, 4).forEach((k, i) => {
+  gateStops.forEach((gate, i) => {
     const p1 = POS["g" + i], mid = {x:(p1.x + ap.x) / 2, y:(p1.y + ap.y) / 2};
     const h1 = el("line", {x1:p1.x, y1:p1.y, x2:mid.x, y2:mid.y, class:"gstrand"}, $("#gstrands"));
     const h2 = el("line", {x1:mid.x, y1:mid.y, x2:ap.x, y2:ap.y, class:"gstrand"}, $("#gstrands"));
     h1.style.transformOrigin = `${p1.x}px ${p1.y}px`; h2.style.transformOrigin = `${ap.x}px ${ap.y}px`;
     GSTR["g" + i] = [h1, h2];
-    NODES["g" + i] = pillNode("g" + i, GATE_LABELS[k] || k, "· · ·");
-    NODES["g" + i].key = k; NODES["g" + i].res = k in g ? !!g[k] : null;
+    NODES["g" + i] = pillNode("g" + i, gateLabel(gate), "· · ·");
+    NODES["g" + i].key = gate.name;
+    NODES["g" + i].res = gate.passed == null ? null : !!gate.passed;
+    NODES["g" + i].why = gateReason(gate);
+    NODES["g" + i].flip = gate.flip || "";
   });
 
   // action node
@@ -642,16 +749,19 @@ function buildStage(row) {
   const as2 = el("text", {x:0, y:76, "text-anchor":"middle", class:"act-sub"}, inner); as2.textContent = `dry-run · live_order ${row ? !!row.live_order : false}`;
   el("circle", {r:11, class:"ringn"}, ag); el("circle", {r:6, class:"dotn"}, ag);
   NODES.action = {id:"action", x:ap.x, y:ap.y, g:ag, reveal: () => {
-    atx.textContent = d.action || "—"; as1.textContent = trunc(d.reason || "", 34);
-    ag.classList.add("visit", actionClass(d.action)); inner.classList.remove("pop"); void inner.getBBox(); inner.classList.add("pop"); }};
+    const withheld = row && (row.data_status === "insufficient" || d.confident === false);
+    atx.textContent = withheld ? "insufficient" : (d.action || "—"); as1.textContent = trunc(d.reason || "", 42);
+    ag.classList.add("visit", withheld ? "bad" : actionClass(d.action)); inner.classList.remove("pop"); void inner.getBBox(); inner.classList.add("pop"); }};
 
   STOPS = [{id:"coin", text: row ? `> target acquired: $${trunc(sym, 16)} · mid $${px(price)} · mcap ${usdK(c.market_cap_usd)}. mapping desk graph…` : "> no decisions in the graph yet. hit Run dry-run to crawl one.", mood:""}];
   if (!row) return;
   if (j.error) STOPS.push({id:"q0", text:`> judgment unreachable: ${trunc(j.error, 90)}`, mood:"fail"});
   else qs.forEach((q, i) => STOPS.push({id:"q" + i, text:q[2](), mood:""}));
-  gk.slice(0, 4).forEach((k, i) => {
-    const lab = GATE_LABELS[k] || k, res = k in g ? g[k] : null;
-    STOPS.push({id:"g" + i, gate:true, text: res == null ? `> gate ${lab}: not evaluated` : res ? `> gate ${lab}: PASS · strand holds` : `> gate ${lab}: FAIL · strand snapped`, mood: res == null ? "" : res ? "pass" : "fail"});
+  gateStops.forEach((gate, i) => {
+    const lab = gateLabel(gate), res = gate.passed == null ? null : !!gate.passed;
+    const why = gate.reason || gateReason(gate);
+    const near = gate.flip ? ` · ${trunc(gate.flip, 90)}` : "";
+    STOPS.push({id:"g" + i, gate:true, text: res == null ? `> gate ${lab}: not evaluated` : res ? `> gate ${lab}: PASS · ${why}` : `> gate ${lab}: FAIL · ${why}${near}`, mood: res == null ? "" : res ? "pass" : "fail"});
   });
   STOPS.push({id:"action", text:`> verdict: ${(d.action || "—").toUpperCase()}. ${d.reason || ""}. no order sent (dry-run, live_order ${!!row.live_order}).`, mood: actionClass(d.action) === "ok" ? "pass" : actionClass(d.action) === "bad" ? "fail" : ""});
 }
@@ -717,7 +827,14 @@ async function tour(row) {
           requestAnimationFrame(() => { h1.style.transform = "rotate(8deg)"; h2.style.transform = "rotate(-8deg)"; });
           setTimeout(() => { if (token === tourToken) { h1.style.opacity = .55; h2.style.opacity = .55; } }, 900); }
         else ripple(n.x, n.y, "#8E9791");
-      } else if (st.id === "action") { n.reveal(); const ac = actionClass(rowIntent(row).action); ripple(n.x, n.y, ac === "ok" ? "#86efac" : ac === "bad" ? "#E08A82" : "#C6B48A"); mascotReact(ac === "bad" ? "fail" : "pass"); }
+      } else if (st.id === "action") {
+        n.reveal();
+        const intent = rowIntent(row);
+        const withheld = row && (row.data_status === "insufficient" || intent.confident === false);
+        const ac = withheld ? "bad" : actionClass(intent.action);
+        ripple(n.x, n.y, ac === "ok" ? "#86efac" : ac === "bad" ? "#E08A82" : "#C6B48A");
+        mascotReact(ac === "bad" ? "fail" : "pass");
+      }
       else ripple(n.x, n.y, "#86efac");
       await say(st.text, st.mood, token);
       await sleep(st.id === "action" ? 3600 : st.gate ? 1400 : 1100);

@@ -79,9 +79,14 @@ def test_liquidity_hold(demo_snapshot, passing_judgment):
 def test_judgment_error_holds_and_still_records_gates(demo_snapshot):
     out = decide(demo_snapshot, {"error": "TYPESAFE_API_KEY not set"})
     assert out["intent"]["action"] == "hold"
-    assert out["intent"]["reason"] == "TYPESAFE_API_KEY not set"
+    assert out["intent"]["confident"] is False
+    assert out["data_status"] == "insufficient"
+    assert out["intent"]["reason"].startswith("insufficient data:")
+    assert "TYPESAFE_API_KEY not set" in out["intent"]["reason"]
+    assert "source=demo" in out["intent"]["reason"]
     assert len(out["gates"]) == 4
     assert all(g["passed"] is False for g in out["gates"])
+    assert all(g["reason"] for g in out["gates"])
 
 
 def test_inventory_wins_policy_order(demo_snapshot, passing_judgment):
