@@ -1,0 +1,14 @@
+﻿.venv/
+data/
+.env
+.env.*
+__pycache__/
+*.pyc
+dashboard/__pycache__/
+dashboard/*.log
+dashboard/url.txt
+dashboard/live-view.png
+dashboard/preview_*.png
+*.log
+.DS_Store
+Thumbs.db
