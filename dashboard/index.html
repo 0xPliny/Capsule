@@ -968,7 +968,7 @@ function startDust() {
 }
 
 // ------------------------------------------------------------- holder risk (paper, presentational)
-// Copy owns the strings. Backend owns verdict, score, reason, sample CA, and log events.
+// Copy owns the strings. The strip and log read holder_risk from /api/latest.
 // Names, CAs, reasons, and log lines are untrusted: text nodes only, never HTML.
 const COPY = {
   stripTitle: "Holder risk",
@@ -1000,38 +1000,21 @@ const COPY = {
 };
 const HOLDER_VERDICTS = ["OK", "RISKY", "DANGER"];
 const HOLDER_STATES = ["idle", "scanning", "done", "error", "insufficient"];
-const HOLDER_PAPER_CA = "PaperDemoMint111111111111111111111";
-let holderSampleCa = HOLDER_PAPER_CA;
-let holderScannedCa = "";
-let holderGen = 0;
+const HOLDER_SAMPLE_CA = "PaperDemoMint111111111111111111111111111";
+let holderSampleCa = HOLDER_SAMPLE_CA;
 let holderPauseSig = "";
-let holderView = {
-  state: "idle", verdict: "", score: null, reason: "", log: [],
-  is_sample: false, no_cluster: false, top10_pct: null, max_pct: null, dev_pct: null,
-};
+let holderView = blankHolder([]);
 
-function holderField(v) {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string") return v;
-  return null;
-}
-function holderBlank(v) {
-  if (typeof v === "number" && Number.isFinite(v)) return String(v);
-  if (typeof v === "string" && v !== "") return v;
-  return "—";
-}
 function eventSample(ev) {
   if (!ev || typeof ev !== "object") return false;
   if (ev.synthetic === true || ev.is_sample === true || ev.sample === true) return true;
   const lvl = typeof ev.level === "string" ? ev.level.toLowerCase() : "";
   return lvl === "sample" || lvl === "synthetic";
 }
-function holderInsufficient(raw) {
-  if (!raw || typeof raw !== "object") return false;
-  if (raw.state === "insufficient" || raw.insufficient === true || raw.fail_closed === true) return true;
-  if (raw.data_status === "insufficient" || raw.cluster === "insufficient") return true;
-  const code = typeof raw.code === "string" ? raw.code : (typeof raw.reason_code === "string" ? raw.reason_code : (typeof raw.kind === "string" ? raw.kind : ""));
-  return code === "insufficient" || code === "fail_closed";
+function failClosedKind(raw) {
+  const reason = raw && typeof raw.reason === "string" ? raw.reason : "";
+  if (/missing|not enough|insufficient/i.test(reason)) return "insufficient";
+  return "error";
 }
 function normalizeLog(log) {
   if (!Array.isArray(log)) return [];
@@ -1049,29 +1032,25 @@ function normalizeLog(log) {
 }
 function normalizeHolder(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  let state = HOLDER_STATES.includes(raw.state) ? raw.state : "idle";
-  let verdict = HOLDER_VERDICTS.includes(raw.verdict) ? raw.verdict : "";
-  if (holderInsufficient(raw)) state = "insufficient";
-  if (state !== "done") verdict = "";
-  else if (!verdict) state = "insufficient";
+  const reported = HOLDER_STATES.includes(raw.state) ? raw.state : "idle";
+  const verdict = HOLDER_VERDICTS.includes(raw.verdict) ? raw.verdict : "";
+  let state = reported;
+  if (reported === "done" && !verdict) state = failClosedKind(raw);
+  else if (reported === "error") state = failClosedKind(raw);
+  else if (reported !== "done" && reported !== "scanning" && reported !== "idle") state = failClosedKind(raw);
+  const called = state === "done" && !!verdict;
   let score = null;
-  if (state === "done" && typeof raw.score === "number" && raw.score >= 0 && raw.score <= 100) score = raw.score;
-  const noCluster = raw.no_cluster === true || raw.cluster === false || raw.cluster === "none";
+  if (called && typeof raw.score === "number" && raw.score >= 0 && raw.score <= 100) score = raw.score;
+  const sampleCa = typeof raw.sample_ca === "string" ? raw.sample_ca : "";
   return {
     state,
-    verdict: state === "done" ? verdict : "",
+    verdict: called ? verdict : "",
     score,
-    reason: typeof raw.reason === "string" ? raw.reason : "",
+    reason: called && typeof raw.reason === "string" ? raw.reason : "",
     log: normalizeLog(raw.log),
-    is_sample: raw.is_sample === true || raw.synthetic === true,
-    no_cluster: noCluster,
-    top10_pct: holderField(raw.top10_pct),
-    max_pct: holderField(raw.max_pct),
-    dev_pct: holderField(raw.dev_pct),
+    is_sample: raw.is_sample === true,
+    sample_ca: sampleCa,
   };
-}
-function caPlausible(ca) {
-  return isMint(ca) || /^0x[a-fA-F0-9]{40}$/.test(ca);
 }
 function hms(ts) {
   const d = new Date(ts);
@@ -1084,22 +1063,12 @@ function reasonLine(view) {
   if (view.state === "insufficient") return COPY.insufficient;
   if (view.state === "error") return COPY.error;
   if (view.state !== "done") return COPY.idle;
-  if (typeof view.reason === "string" && view.reason.length) return view.reason;
-  let key = view.verdict;
-  if (view.verdict === "OK") {
-    const mild = view.max_pct != null && view.max_pct !== "" && view.no_cluster !== true;
-    key = mild ? "OK_MILD" : "OK_NONE";
-  } else if (view.verdict === "RISKY" && view.dev_pct != null && view.dev_pct !== "") {
-    key = "RISKY_DEV";
-  }
-  const tpl = COPY.reasons[key];
-  if (!tpl) return COPY.idle;
-  return tpl.replace(/\{(top10_pct|max_pct|dev_pct)\}/g, (_, k) => holderBlank(view[k]));
+  return typeof view.reason === "string" ? view.reason : "";
 }
 function blankHolder(log) {
   return {
     state: "idle", verdict: "", score: null, reason: "", log: log || [],
-    is_sample: false, no_cluster: false, top10_pct: null, max_pct: null, dev_pct: null,
+    is_sample: false, sample_ca: "",
   };
 }
 function logRow(parent, kind) {
@@ -1201,25 +1170,21 @@ function mountHolderCopy() {
   $("#crawler-summary").textContent = COPY.logTitle;
   $("#holder-reason").title = COPY.tooltip;
 }
-function mockFromCa(ca) {
-  let h = 2166136261;
-  for (let i = 0; i < ca.length; i++) {
-    h ^= ca.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  h >>>= 0;
-  const verdict = HOLDER_VERDICTS[h % HOLDER_VERDICTS.length];
-  const top10 = 12 + (h % 70);
-  const noCluster = verdict === "OK" && (h & 2) === 2;
-  const max = noCluster ? null : 4 + (h % Math.max(1, Math.min(40, top10 - 1)));
-  const dev = verdict === "RISKY" && (h & 1) ? 3 + (h % 18) : null;
-  return { verdict, top10_pct: top10, max_pct: max, dev_pct: dev, no_cluster: noCluster };
+function readHolderRisk(latest) {
+  if (!latest || typeof latest !== "object") return null;
+  const top = latest.holder_risk;
+  const nested = latest.row && latest.row.holder_risk;
+  const raw = (top && typeof top === "object" && !Array.isArray(top)) ? top
+    : (nested && typeof nested === "object" && !Array.isArray(nested)) ? nested
+    : null;
+  if (!raw || (!("state" in raw) && !("verdict" in raw) && !raw.log)) return null;
+  return raw;
 }
 function sampleCaActive() {
+  if (!holderView.is_sample) return false;
   const v = ($("#holder-ca") && $("#holder-ca").value || "").trim();
-  if (!v) return false;
-  if (holderSampleCa && v === holderSampleCa) return true;
-  return !!(holderView.is_sample && v === holderScannedCa);
+  if (!v) return true;
+  return v === (holderView.sample_ca || holderSampleCa);
 }
 function renderSamplePill() {
   const pill = $("#holder-sample-pill");
@@ -1244,86 +1209,27 @@ function syncDeskHolderSignal(view) {
   holderPauseSig = sig;
   root.dispatchEvent(new CustomEvent("capsule-holder-risk", { detail: { pause: !!sig, verdict: sig } }));
 }
-async function fetchHolder(ca) {
-  try {
-    const r = await fetch("/api/holder-risk?ca=" + encodeURIComponent(ca), { headers: { "Accept": "application/json" } });
-    if (!r.ok) return null;
-    const j = await r.json();
-    const body = j && typeof j === "object" ? j : null;
-    const nested = body && body.holder_risk && typeof body.holder_risk === "object" && !Array.isArray(body.holder_risk);
-    const raw = nested ? body.holder_risk : body;
-    if (!raw || (!raw.state && !raw.verdict)) return null;
-    const n = normalizeHolder(raw);
-    const sample = raw && typeof raw.sample_ca === "string" ? raw.sample_ca : (body && typeof body.sample_ca === "string" ? body.sample_ca : "");
-    if (n && sample) holderSampleCa = sample;
-    return n;
-  } catch (e) {
-    return null;
-  }
-}
 function adoptHolderPayload(raw) {
-  if (!raw || typeof raw !== "object") return;
+  if (!raw || typeof raw !== "object") {
+    holderView = blankHolder([]);
+    renderHolder(holderView);
+    return;
+  }
   const n = normalizeHolder(raw);
   if (!n) return;
-  if (typeof raw.sample_ca === "string" && raw.sample_ca) holderSampleCa = raw.sample_ca;
-  if (holderView.state === "scanning") return;
-  if (n.state === "idle" && holderView.state !== "idle") return;
+  if (n.sample_ca) holderSampleCa = n.sample_ca;
   holderView = n;
-  renderHolder(holderView);
-}
-async function runHolderScan(ca) {
-  const gen = ++holderGen;
-  const trimmed = String(ca ?? "").trim();
-  holderScannedCa = trimmed;
-  if (!trimmed) {
-    holderView = blankHolder([]);
-    holderView.state = "error";
-    renderHolder(holderView);
-    return;
-  }
-  holderView = blankHolder([]);
-  holderView.state = "scanning";
-  holderView.is_sample = trimmed === holderSampleCa;
-  renderHolder(holderView);
-  const remote = await fetchHolder(trimmed);
-  if (gen !== holderGen) return;
-  await sleep(1200);
-  if (gen !== holderGen) return;
-  if (remote) {
-    holderView = remote;
-    renderHolder(holderView);
-    return;
-  }
-  if (!caPlausible(trimmed)) {
-    holderView = blankHolder([]);
-    holderView.state = "error";
-    renderHolder(holderView);
-    return;
-  }
-  const mock = mockFromCa(trimmed);
-  holderView = {
-    state: "done",
-    verdict: mock.verdict,
-    score: null,
-    reason: "",
-    log: [],
-    is_sample: trimmed === holderSampleCa,
-    no_cluster: mock.no_cluster,
-    top10_pct: mock.top10_pct,
-    max_pct: mock.max_pct,
-    dev_pct: mock.dev_pct,
-  };
   renderHolder(holderView);
 }
 function bindHolder() {
   $("#holder-form").addEventListener("submit", (ev) => {
     ev.preventDefault();
-    runHolderScan($("#holder-ca").value);
+    refresh(false);
   });
   $("#holder-try").addEventListener("click", () => {
     $("#holder-ca").value = holderSampleCa;
     renderSamplePill();
-    runHolderScan(holderSampleCa);
+    refresh(false);
   });
   $("#holder-ca").addEventListener("input", () => renderSamplePill());
 }
@@ -1337,7 +1243,7 @@ async function refresh(forceTour) {
   try {
     const [latest, logs] = await Promise.all([fetch("/api/latest").then(r => r.json()), fetch("/api/logs").then(r => r.json())]);
     renderPanels(latest.row); renderLogs(logs.rows);
-    adoptHolderPayload(latest.holder_risk || (latest.row && latest.row.holder_risk));
+    adoptHolderPayload(readHolderRisk(latest));
     const ts = latest.row && latest.row.ts;
     if (forceTour || ts !== lastTs) { lastTs = ts; tour(latest.row); }
     $("#stage").classList.toggle("busy", !!latest.running || $("#run").disabled);
