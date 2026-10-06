@@ -91,6 +91,11 @@ def test_independent_rows_are_ok_not_a_clearance(passing_judgment):
     assert risk["verdict"] == "OK"
     assert risk["score"] == 0
     assert risk["reason"] == "No large holder cluster found. Top 10 hold 16%."
+    assert risk["no_cluster"] is True
+    assert risk["top10_pct"] == 16
+    assert risk["max_pct"] == 2
+    assert 0 <= risk["top10_pct"] <= 100
+    assert 0 <= risk["max_pct"] <= 100
     assert "safe" not in risk["reason"].lower()
     assert risk["is_sample"] is True
     assert risk["sample_ca"] == SAMPLE_CA
@@ -115,6 +120,7 @@ def test_shared_funder_is_risky_and_blocks_paper(passing_judgment):
     assert risk["verdict"] == "RISKY"
     assert risk["state"] == "done"
     assert risk["reason"] == "3 wallets share funder Fund..1111"
+    assert risk["no_cluster"] is False
     assert out["intent"]["action"] == "hold"
     assert out["intent"]["confident"] is True
     assert "holder cluster" in out["intent"]["reason"]
@@ -129,6 +135,7 @@ def test_same_block_cluster_is_danger(passing_judgment):
     risk = out["holder_risk"]
     assert risk["verdict"] == "DANGER"
     assert risk["reason"] == "same-block cluster 100%"
+    assert risk["no_cluster"] is False
     assert out["intent"]["action"] == "hold"
     assert risk["is_sample"] is False
     assert all(line["level"] != "SAMPLE" and not line["message"].startswith("SAMPLE ") for line in risk["log"])
@@ -145,6 +152,7 @@ def test_linked_owners_score_without_a_shared_label(passing_judgment):
     risk = out["holder_risk"]
     assert risk["verdict"] == "DANGER"
     assert risk["reason"] == "linked wallets 3/4"
+    assert risk["no_cluster"] is False
     assert "score" in risk
 
 
@@ -158,7 +166,9 @@ def test_missing_holder_rows_omit_verdict(demo_snapshot, passing_judgment):
     assert out["intent"]["confident"] is False
     assert risk["state"] == "error"
     assert risk["verdict"] is None
+    assert risk["no_cluster"] is False
     assert "score" not in risk
+    assert "top10_pct" not in risk
     blob = json.dumps(risk)
     assert "NO_CLUSTER" not in blob
     assert "NO_CLUSTER_FOUND" not in blob
@@ -176,6 +186,7 @@ def test_incomplete_rows_fail_closed(passing_judgment):
     out = decide(_snap(rows), passing_judgment)
     assert out["holder_risk"]["state"] == "error"
     assert out["holder_risk"]["verdict"] is None
+    assert out["holder_risk"]["no_cluster"] is False
     assert out["intent"]["confident"] is False
     assert out["intent"]["action"] != "paper_long"
 
@@ -190,6 +201,8 @@ def test_sample_mint_fixture_offline(passing_judgment):
     assert risk["is_sample"] is True
     assert risk["state"] == "done"
     assert risk["verdict"] == "OK"
+    assert risk["no_cluster"] is True
+    assert isinstance(risk["top10_pct"], int) and 0 <= risk["top10_pct"] <= 100
     assert out["intent"]["action"] == "paper_long"
     assert out["intent"]["confident"] is True
     assert all(line["level"] == "SAMPLE" for line in risk["log"])
@@ -208,6 +221,8 @@ def test_demo_source_exposes_sample_ca():
     assert snap["coin"]["mint"] == SAMPLE_CA
     assert out["holder_risk"]["is_sample"] is True
     assert out["holder_risk"]["verdict"] == "OK"
+    assert out["holder_risk"]["no_cluster"] is True
+    assert out["holder_risk"]["top10_pct"] == 16
     assert out["intent"]["action"] == "paper_long"
 
 
@@ -331,9 +346,46 @@ def test_rpc_failure_omits_ok(passing_judgment):
     out = decide(snap, passing_judgment)
     assert out["holder_risk"]["state"] == "error"
     assert out["holder_risk"]["verdict"] is None
+    assert out["holder_risk"]["no_cluster"] is False
     assert "score" not in out["holder_risk"]
+    assert "top10_pct" not in out["holder_risk"]
     assert out["intent"]["action"] == "hold"
     assert out["intent"]["confident"] is False
+
+
+def test_small_cluster_stays_ok_but_is_not_no_cluster(passing_judgment):
+    rows = _rows(10, amount=1)
+    for row in rows[:2]:
+        row["funder"] = "FunderShared11111111111111111111111111"
+    out = decide(_snap(rows, supply=100), passing_judgment)
+    risk = out["holder_risk"]
+    assert risk["state"] == "done"
+    assert risk["verdict"] == "OK"
+    assert risk["no_cluster"] is False
+    assert risk["reason"] == "2 wallets share funder Fund..1111"
+    assert "No large holder cluster found" not in risk["reason"]
+    assert out["intent"]["action"] == "paper_long"
+    assert risk["top10_pct"] == 10
+    assert risk["max_pct"] == 1
+
+
+def test_out_of_range_percents_are_omitted(passing_judgment):
+    rows = _rows(3, amount=80)
+    out = decide(_snap(rows, supply=10), passing_judgment)
+    risk = out["holder_risk"]
+    assert risk["verdict"] == "OK"
+    assert risk["no_cluster"] is True
+    assert "top10_pct" not in risk
+    assert "max_pct" not in risk
+    assert risk["reason"] == "No large holder cluster found."
+    # Boundaries 0 and 100 are real figures and stay on the payload.
+    zero = decide(_snap(_rows(4, amount=0), supply=100), passing_judgment)["holder_risk"]
+    assert zero["no_cluster"] is True
+    assert zero["top10_pct"] == 0
+    assert zero["max_pct"] == 0
+    full = decide(_snap(_rows(1, amount=50), supply=50), passing_judgment)["holder_risk"]
+    assert full["top10_pct"] == 100
+    assert full["max_pct"] == 100
 
 
 def test_disallowed_rpc_method_does_not_post():

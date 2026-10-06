@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 import re
 import urllib.error
 import urllib.request
@@ -164,33 +165,70 @@ def _short(label: str) -> str:
     return text[:4] + ".." + text[-4:]
 
 
-def _top10_pct(rows: list[dict], supply) -> int | None:
+def _pct(part, supply) -> int | None:
+    """Integer percent in 0..100, or None when the figure is missing or out of range.
+
+    Out-of-range values are omitted. Frontend treats a missing percent as missing,
+    and will not treat that omission as "no cluster".
+    """
+    if isinstance(part, bool) or isinstance(supply, bool):
+        return None
     try:
+        num = float(part)
         total = float(supply)
     except (TypeError, ValueError):
         return None
-    if total <= 0:
+    if not math.isfinite(num) or not math.isfinite(total) or total <= 0:
         return None
+    pct = num / total * 100
+    if not math.isfinite(pct):
+        return None
+    rounded = int(round(pct))
+    if 0 <= rounded <= 100:
+        return rounded
+    return None
+
+
+def _concentration(rows: list[dict], supply) -> dict[str, int]:
     amounts = []
     for row in rows:
         amt = row.get("amount")
         if isinstance(amt, bool) or not isinstance(amt, (int, float)):
             continue
+        if not math.isfinite(float(amt)) or float(amt) < 0:
+            continue
         amounts.append(float(amt))
     if not amounts:
-        return None
-    top = sorted(amounts, reverse=True)[:10]
-    return int(round(sum(top) / total * 100))
+        return {}
+    out = {}
+    top10 = _pct(sum(sorted(amounts, reverse=True)[:10]), supply)
+    largest = _pct(max(amounts), supply)
+    if top10 is not None:
+        out["top10_pct"] = top10
+    if largest is not None:
+        out["max_pct"] = largest
+    return out
 
 
 def _ok_reason(pct: int | None) -> str:
-    # Copy line for a finished check with no elevated cluster. Not a buy clearance.
+    # Copy line only when the check found no cluster. Not a buy clearance.
     if pct is None:
         return "No large holder cluster found."
     return f"No large holder cluster found. Top 10 hold {pct}%."
 
 
-def _score_rows(rows: list[dict], supply) -> tuple[float, str, str]:
+def _pattern_reason(funder_ratio, funder_label, funder_n, block_ratio, linked_ratio, linked_n, n) -> str:
+    if funder_ratio >= block_ratio and funder_ratio >= linked_ratio and funder_n >= 2:
+        shown = _short(_public_line(funder_label or "", 44))
+        if shown:
+            return f"{funder_n} wallets share funder {shown}"
+        return f"{funder_n} wallets share a funder"
+    if block_ratio >= linked_ratio and block_ratio > 0:
+        return f"same-block cluster {int(round(block_ratio * 100))}%"
+    return f"linked wallets {linked_n}/{n}"
+
+
+def _score_rows(rows: list[dict], supply) -> dict:
     by_owner: dict[str, dict] = {}
     for row in rows:
         owner = _owner(row)
@@ -274,23 +312,32 @@ def _score_rows(rows: list[dict], supply) -> tuple[float, str, str]:
 
     value = max(funder_ratio, block_ratio, linked_ratio)
     value = round(min(1.0, max(0.0, value)), 6)
+    percents = _concentration(collapsed, supply)
+    # no_cluster is the "no large holder cluster" finding: a finished OK check
+    # with no shared-funder, same-block, or linked group. A real group, even one
+    # still under the 0.35 gate, is a cluster.
+    no_cluster = value == 0
     if value < OK_LT:
         verdict = "OK"
-        reason = _ok_reason(_top10_pct(collapsed, supply))
+        if no_cluster:
+            reason = _ok_reason(percents.get("top10_pct"))
+        else:
+            reason = _pattern_reason(
+                funder_ratio, funder_label, funder_n, block_ratio, linked_ratio, linked_n, n,
+            )
     else:
         verdict = "RISKY" if value < RISKY_LT else "DANGER"
-        # Prefer the strongest observed pattern. Funder text is display-only.
-        if funder_ratio >= block_ratio and funder_ratio >= linked_ratio and funder_n >= 2:
-            shown = _short(_public_line(funder_label or "", 44))
-            if shown:
-                reason = f"{funder_n} wallets share funder {shown}"
-            else:
-                reason = f"{funder_n} wallets share a funder"
-        elif block_ratio >= linked_ratio and block_ratio > 0:
-            reason = f"same-block cluster {int(round(block_ratio * 100))}%"
-        else:
-            reason = f"linked wallets {linked_n}/{n}"
-    return value, _public_line(reason, _REASON_LIMIT), verdict
+        no_cluster = False
+        reason = _pattern_reason(
+            funder_ratio, funder_label, funder_n, block_ratio, linked_ratio, linked_n, n,
+        )
+    return {
+        "value": value,
+        "reason": _public_line(reason, _REASON_LIMIT),
+        "verdict": verdict,
+        "no_cluster": no_cluster,
+        "percents": percents,
+    }
 
 
 def _risk(
@@ -303,6 +350,8 @@ def _risk(
     reason: str,
     endpoint: str,
     logs: list[dict],
+    no_cluster: bool = False,
+    percents: dict | None = None,
 ) -> dict:
     if verdict in _FORBIDDEN_VERDICTS:
         verdict = None
@@ -331,6 +380,20 @@ def _risk(
     }
     if score is not None and verdict is not None:
         risk["score"] = int(max(0, min(100, score)))
+    # Explicit false on error and on any found cluster. True only for that OK finding.
+    if state == "done" and verdict == "OK" and no_cluster:
+        risk["no_cluster"] = True
+    else:
+        risk["no_cluster"] = False
+    if state == "done" and verdict is not None:
+        for key, num in (percents or {}).items():
+            if isinstance(num, bool) or not isinstance(num, (int, float)):
+                continue
+            if isinstance(num, float) and not math.isfinite(num):
+                continue
+            rounded = int(round(float(num)))
+            if 0 <= rounded <= 100:
+                risk[key] = rounded
     return {
         "value": value,
         "endpoint": plain_text(endpoint, 160) or SOLANA_RPC,
@@ -366,7 +429,10 @@ def assess_holders(snapshot: dict | None) -> dict:
             endpoint=endpoint,
             logs=logs,
         )
-    value, reason, verdict = _score_rows(rows, holders.get("supply"))
+    scored = _score_rows(rows, holders.get("supply"))
+    value = scored["value"]
+    reason = scored["reason"]
+    verdict = scored["verdict"]
     score = int(round(value * 100))
     level = "info" if verdict == "OK" else "warn"
     logs = list(prior) + [
@@ -382,6 +448,8 @@ def assess_holders(snapshot: dict | None) -> dict:
         reason=reason,
         endpoint=endpoint,
         logs=logs,
+        no_cluster=bool(scored["no_cluster"]),
+        percents=scored["percents"],
     )
 
 
