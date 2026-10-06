@@ -1020,7 +1020,8 @@ function eventSample(ev) {
   return lvl === "sample" || lvl === "synthetic";
 }
 function numOrNull(v) {
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
+  if (typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 100) return null;
+  return v;
 }
 function normalizeLog(log) {
   if (!Array.isArray(log)) return [];
@@ -1057,6 +1058,7 @@ function normalizeHolder(raw) {
       max_pct: numOrNull(raw.max_pct),
       dev_pct: numOrNull(raw.dev_pct),
     } : null,
+    no_cluster: raw.no_cluster === true,
     log: normalizeLog(raw.log),
     is_sample: raw.is_sample === true,
     sample_ca: sampleCa,
@@ -1068,21 +1070,23 @@ function hms(ts) {
   const p = (n) => String(n).padStart(2, "0");
   return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
 }
-function templateSpec(verdict, pct) {
-  const has = (key) => typeof (pct && pct[key]) === "number";
-  if (verdict === "OK") {
-    if (has("max_pct")) return { template: COPY.reasons.OK_MILD, keys: ["top10_pct", "max_pct"] };
-    return { template: COPY.reasons.OK_NONE, keys: ["top10_pct"] };
+function templateSpec(view) {
+  const pct = view.pct || {};
+  const has = (key) => typeof pct[key] === "number";
+  if (view.verdict === "OK") {
+    if (has("top10_pct") && has("max_pct")) return { template: COPY.reasons.OK_MILD, keys: ["top10_pct", "max_pct"] };
+    if (view.no_cluster === true && has("top10_pct")) return { template: COPY.reasons.OK_NONE, keys: ["top10_pct"] };
+    return null;
   }
-  if (verdict === "RISKY") {
+  if (view.verdict === "RISKY") {
     if (has("dev_pct")) return { template: COPY.reasons.RISKY_DEV, keys: ["top10_pct", "dev_pct"] };
     return { template: COPY.reasons.RISKY, keys: ["top10_pct", "max_pct"] };
   }
-  if (verdict === "DANGER") return { template: COPY.reasons.DANGER, keys: ["top10_pct", "max_pct"] };
+  if (view.verdict === "DANGER") return { template: COPY.reasons.DANGER, keys: ["top10_pct", "max_pct"] };
   return null;
 }
 function filledTemplate(view) {
-  const spec = templateSpec(view.verdict, view.pct);
+  const spec = templateSpec(view);
   if (!spec) return "";
   const pct = view.pct || {};
   for (const key of spec.keys) {
@@ -1111,7 +1115,7 @@ function reasonLine(view) {
 }
 function blankHolder(log) {
   return {
-    state: "idle", verdict: "", score: null, reason: "", pct: null, log: log || [],
+    state: "idle", verdict: "", score: null, reason: "", pct: null, no_cluster: false, log: log || [],
     is_sample: false, sample_ca: "",
   };
 }
