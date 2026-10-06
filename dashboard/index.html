@@ -310,7 +310,7 @@
     .holder-ca { min-width:0; flex:1 1 100%; max-width:none; }
     #evidence { grid-template-columns:1fr; }
   }
-  @media (max-width: 420px) {
+  @media (max-width: 480px) {
     #pet-svg { transform:scale(0.70); transform-origin:center; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -770,7 +770,7 @@ function drawEdges() {
 
 // ------------------------------------------------------------- capsule spider: 8-leg desk pet
 // Cream/emerald pill head, solid black oval eyes, thin smile. Roams below the header.
-// 2-bone IK (hip→knee→foot), alternating groups of 4. prefers-reduced-motion: planted, no roam.
+// 2-bone IK (hip→knee→foot), alternating groups of 4. prefers-reduced-motion: same bubble-free park, no roam.
 // Click / Enter / Space: hop + wink (~900ms). Reduced motion: wink only. Cooldown 1.5s from start.
 const PET = { x: 0, y: 0, h: 0.2, hT: 0.2, walking: false };
 const L1 = 16, L2 = 18, REACH = L1 + L2;
@@ -798,6 +798,24 @@ function roamBounds() {
   const maxX = Math.max(minX + 48, innerWidth - inset - half);
   return { minX, maxX, minY, maxY };
 }
+function speechRect() {
+  const cap = $("#bubble");
+  if (!cap || !cap.classList.contains("show")) return null;
+  const r = cap.getBoundingClientRect();
+  if (r.width < 2 || r.height < 2) return null;
+  const p = innerWidth <= 640 ? 8 : 6;
+  return {l: r.left - p, t: r.top - p, r: r.right + p, b: r.bottom + p, w: r.width};
+}
+function speechLane() {
+  const shown = speechRect();
+  if (shown) return shown;
+  if (innerWidth > 640) return null;
+  const stage = $("#stage").getBoundingClientRect();
+  if (stage.width < 40) return null;
+  const bw = Math.min(200, stage.width * 0.54);
+  const right = stage.left + Math.min(stage.width * 0.56, 12 + bw);
+  return {l: stage.left + 2, t: stage.top + 28, r: right, b: stage.top + 116, w: bw};
+}
 function avoidRects() {
   const out = [];
   const add = (el, pad) => {
@@ -811,8 +829,8 @@ function avoidRects() {
   add($("#run"), 14);
   add(document.querySelector(".mode-badge"), 8);
   document.querySelectorAll("#stage .hud").forEach((el) => add(el, 6));
-  const cap = $("#bubble");
-  if (cap && cap.classList.contains("show")) add(cap, innerWidth <= 640 ? 8 : 6);
+  const speech = speechRect();
+  if (speech) out.push({l: speech.l, t: speech.t, r: speech.r, b: speech.b});
   add($("#holder-chips"), 8);
   add($("#holder-strip"), 2);
   return out;
@@ -848,7 +866,7 @@ function stageHudGap() {
   return {stage, top, bot};
 }
 function petScale() {
-  if (innerWidth <= 420) return 0.7;
+  if (innerWidth <= 480) return 0.7;
   if (innerWidth <= 640) return 0.85;
   return 1;
 }
@@ -868,11 +886,8 @@ function segmentHitsHud(a, b) {
   const rects = hudRects();
   if (!rects.length) return false;
   const half = narrowReach();
-  const cap = $("#bubble");
-  if (cap && cap.classList.contains("show")) {
-    const r = cap.getBoundingClientRect();
-    if (r.width > 2) rects.push({l: r.left - 8, t: r.top - 8, r: r.right + 8, b: r.bottom + 8, w: r.width});
-  }
+  const speech = speechRect();
+  if (speech) rects.push(speech);
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
   const steps = Math.max(1, Math.ceil(dist / 8));
   for (let i = 0; i <= steps; i++) {
@@ -892,16 +907,13 @@ function hudLane() {
   let maxX = stage.right - reach;
   let minY = top + reach + pad;
   let maxY = bot - reach - pad;
-  const cap = $("#bubble");
-  if (cap && cap.classList.contains("show")) {
-    const r = cap.getBoundingClientRect();
-    if (r.width > 2 && r.height > 2 && r.bottom > minY && r.top < maxY) {
-      const gutter = reach + 6;
-      const leftRoom = r.left - gutter - minX;
-      const rightRoom = maxX - (r.right + gutter);
-      if (rightRoom >= leftRoom) minX = Math.max(minX, r.right + gutter);
-      else maxX = Math.min(maxX, r.left - gutter);
-    }
+  const speech = speechRect();
+  if (speech && speech.b > minY && speech.t < maxY) {
+    const gutter = reach + 6;
+    const leftRoom = speech.l - gutter - minX;
+    const rightRoom = maxX - (speech.r + gutter);
+    if (rightRoom >= leftRoom) minX = Math.max(minX, speech.r + gutter);
+    else maxX = Math.min(maxX, speech.l - gutter);
   }
   const loX = stage.left + reach, hiX = Math.max(loX, stage.right - reach);
   const loY = top + reach + pad, hiY = Math.max(loY, bot - reach - pad);
@@ -917,19 +929,55 @@ function hudLane() {
 function pickStageWaypoint(b) {
   const spanX = Math.max(0, b.maxX - b.minX);
   const spanY = Math.max(0, b.maxY - b.minY);
-  const minStep = Math.min(48, Math.max(16, spanX * 0.4));
+  const minStep = Math.min(48, Math.max(16, Math.max(spanX, spanY) * 0.4));
   for (let n = 0; n < 12; n++) {
     const p = {x: b.minX + Math.random() * spanX, y: b.minY + Math.random() * spanY};
     if (hitsAvoid(p.x, p.y, 0) || segmentHitsHud({x: PET.x, y: PET.y}, p)) continue;
     if (Math.hypot(p.x - PET.x, p.y - PET.y) >= minStep) return p;
   }
   const mid = {x: b.minX + spanX / 2, y: b.minY + spanY / 2};
-  if (!hitsAvoid(mid.x, mid.y, 0) && !segmentHitsHud({x: PET.x, y: PET.y}, mid)) return mid;
+  if (Math.hypot(mid.x - PET.x, mid.y - PET.y) >= 8 && !hitsAvoid(mid.x, mid.y, 0) && !segmentHitsHud({x: PET.x, y: PET.y}, mid)) return mid;
+  if (spanX >= 16 || spanY >= 16) {
+    const far = {
+      x: PET.x < (b.minX + b.maxX) / 2 ? b.maxX : b.minX,
+      y: PET.y < (b.minY + b.maxY) / 2 ? b.maxY : b.minY,
+    };
+    if (!hitsAvoid(far.x, far.y, 0) && !segmentHitsHud({x: PET.x, y: PET.y}, far)) return far;
+  }
   return {x: clamp(PET.x, b.minX, b.maxX), y: clamp(PET.y, b.minY, b.maxY)};
+}
+function safeParkSpot() {
+  const b = roamBounds();
+  const mid = {x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2};
+  if (innerWidth > 640) return mid;
+  const spanX = Math.max(0, b.maxX - b.minX);
+  const spanY = Math.max(0, b.maxY - b.minY);
+  let x = b.minX + spanX * (spanX >= 40 ? 0.62 : 0.5);
+  let y = b.minY + spanY * 0.5;
+  const speech = speechLane();
+  if (speech) x = Math.max(x, speech.r + narrowReach() + 8);
+  x = clamp(x, b.minX, b.maxX);
+  y = clamp(y, b.minY, b.maxY);
+  if (!hitsAvoid(x, y, 0)) return {x, y};
+  const spots = [];
+  for (let i = 0; i < 5; i++) {
+    for (let j = 0; j < 5; j++) {
+      spots.push({x: b.minX + spanX * (i / 4), y: b.minY + spanY * (j / 4)});
+    }
+  }
+  spots.push(mid);
+  let best = null, bestD = -1;
+  for (const s of spots) {
+    const px = clamp(s.x, b.minX, b.maxX), py = clamp(s.y, b.minY, b.maxY);
+    if (hitsAvoid(px, py, 0)) continue;
+    const d = speech ? Math.hypot(px - (speech.l + speech.r) / 2, py - (speech.t + speech.b) / 2) : 0;
+    if (d >= bestD) { bestD = d; best = {x: px, y: py}; }
+  }
+  return best || {x, y};
 }
 function parkSpot() {
   const b = roamBounds();
-  if (innerWidth <= 640) return pickStageWaypoint(b);
+  if (innerWidth <= 640) return safeParkSpot();
   const stage = $("#stage").getBoundingClientRect();
   const spots = [];
   if (stage.width > 40) {
@@ -974,12 +1022,10 @@ function worldToLocal(p) {
 }
 function plantVisible() {
   const b = roamBounds();
-  const spot = b.roam === false
-    ? {x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2}
-    : parkSpot();
+  const spot = safeParkSpot();
   PET.x = clamp(spot.x, b.minX, b.maxX);
   PET.y = clamp(spot.y, b.minY, b.maxY);
-  PET.h = REDUCED ? -0.4 : 0.25;
+  PET.h = 0.25;
   PET.hT = PET.h;
   PET.walking = false;
   seg = null;
@@ -1063,7 +1109,7 @@ function snapFoot(l, ideal) {
 function pickWaypoint(first) {
   const b = roamBounds();
   if (innerWidth <= 640) {
-    if (b.roam === false) return {x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2};
+    if (b.roam === false) return safeParkSpot();
     return pickStageWaypoint(b);
   }
   if (first) {
@@ -1120,7 +1166,7 @@ function beginWalk(now, first) {
     dest = parkSpot();
     if (segmentHitsHud({x: PET.x, y: PET.y}, dest)) {
       if (!hitsAvoid(dest.x, dest.y, 0)) { PET.x = dest.x; PET.y = dest.y; }
-      PET.walking = false; seg = null; restUntil = now + 700;
+      PET.walking = false; seg = null; restUntil = now + 480;
       return;
     }
   }
@@ -1215,24 +1261,32 @@ function clampPaintedInside() {
   const box = paintedUnion();
   const stage = $("#stage").getBoundingClientRect();
   const gap = stageHudGap();
-  let minL = stage.left, maxR = stage.right;
-  let minT = Math.max(stage.top, gap.top), maxB = Math.min(stage.bottom, gap.bot);
-  if (!(maxB > minT + 4)) { minT = stage.top; maxB = stage.bottom; }
+  let minL = stage.left + 1, maxR = stage.right - 1;
+  let minT = Math.max(stage.top + 1, gap.top), maxB = Math.min(stage.bottom - 1, gap.bot);
+  if (!(maxB > minT + 4)) {
+    const mid = (gap.top + gap.bot) / 2;
+    minT = Math.max(stage.top + 1, mid - 1);
+    maxB = Math.min(stage.bottom - 1, mid + 1);
+  }
   let dx = 0, dy = 0;
   if (box.l < minL) dx = minL - box.l;
   else if (box.r > maxR) dx = maxR - box.r;
   if (box.t < minT) dy = minT - box.t;
   else if (box.b > maxB) dy = maxB - box.b;
-  const cap = $("#bubble");
-  if (cap && cap.classList.contains("show")) {
-    const r = cap.getBoundingClientRect();
-    const moved = {l: box.l + dx, r: box.r + dx, t: box.t + dy, b: box.b + dy};
-    if (moved.r > r.left && moved.l < r.right && moved.b > r.top && moved.t < r.bottom) {
-      const pushR = r.right - moved.l + 2, pushL = moved.r - r.left + 2;
-      const preferRight = (maxR - r.right) >= (r.left - minL);
-      const tryDx = preferRight ? pushR : -pushL;
-      if (box.l + tryDx >= minL - 0.5 && box.r + tryDx <= maxR + 0.5) dx = tryDx;
-    }
+  const moved = {l: box.l + dx, r: box.r + dx, t: box.t + dy, b: box.b + dy};
+  const blocks = hudRects();
+  const speech = speechRect();
+  if (speech) blocks.push(speech);
+  for (const a of blocks) {
+    if (!(moved.r > a.l && moved.l < a.r && moved.b > a.t && moved.t < a.b)) continue;
+    const pushR = a.r - moved.l + 2, pushL = moved.r - a.l + 2;
+    const preferRight = (maxR - a.r) >= (a.l - minL);
+    const tryDx = preferRight ? pushR : -pushL;
+    const apply = (shift) => {
+      if (moved.l + shift < minL - 0.5 || moved.r + shift > maxR + 0.5) return false;
+      dx += shift; moved.l += shift; moved.r += shift; return true;
+    };
+    if (!apply(tryDx)) apply(preferRight ? -pushL : pushR);
   }
   return {dx, dy};
 }
@@ -1298,8 +1352,9 @@ function syncLegs(now) {
 function onSpiderScroll() {
   const b = roamBounds();
   if (b.roam === false) {
-    PET.x = (b.minX + b.maxX) / 2;
-    PET.y = (b.minY + b.maxY) / 2;
+    const spot = safeParkSpot();
+    PET.x = spot.x;
+    PET.y = spot.y;
   } else {
     PET.x = clamp(PET.x, b.minX, b.maxX);
     PET.y = clamp(PET.y, b.minY, b.maxY);
@@ -1319,10 +1374,10 @@ function renderSpider(now) {
   const prevX = PET.x, prevY = PET.y;
   if (staticPark) {
     seg = null; PET.walking = false;
-    const cx = (b0.minX + b0.maxX) / 2, cy = (b0.minY + b0.maxY) / 2;
-    if (!lastPark.set || Math.hypot(cx - lastPark.x, cy - lastPark.y) > 2) {
-      PET.x = cx; PET.y = cy;
-      lastPark = {set: true, x: cx, y: cy};
+    const spot = safeParkSpot();
+    if (!lastPark.set || Math.hypot(spot.x - lastPark.x, spot.y - lastPark.y) > 2) {
+      PET.x = spot.x; PET.y = spot.y;
+      lastPark = {set: true, x: spot.x, y: spot.y};
     }
   } else {
     lastPark.set = false;
@@ -1338,7 +1393,7 @@ function renderSpider(now) {
     PET.hT = Math.atan2(seg.to.y - seg.from.y, seg.to.x - seg.from.x);
     if (u >= 1) {
       PET.x = seg.to.x; PET.y = seg.to.y; PET.walking = false; seg = null;
-      restUntil = now + 800 + Math.random() * 1200;
+      restUntil = now + 420 + Math.random() * 880;
       hopUntil = now + 260;
       if (hitsAvoid(PET.x, PET.y, 0)) restUntil = now + 40;
     }
@@ -1426,7 +1481,22 @@ function positionBubble() {
   left = Math.max(10, Math.min(st.width - bw - 10, left));
   top = Math.max(36, Math.min(st.height - bh - foot, top));
   bubble.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px)`;
-  settleOffChrome();
+  if (REDUCED && innerWidth <= 640) {
+    plantVisible();
+    plantFeet();
+    placeHost();
+    const now = performance.now();
+    syncLegs(now);
+    const nudge = clampPaintedInside();
+    if (nudge.dx || nudge.dy) {
+      PET.x += nudge.dx; PET.y += nudge.dy;
+      plantFeet();
+      placeHost();
+      syncLegs(now);
+    }
+  } else {
+    settleOffChrome();
+  }
 }
 function sayTyping() { bubbleType++; bubble.className = "show"; bubble.innerHTML = `<span class="who">Capsule · paper</span><span class="typing"><i></i><i></i><i></i></span>`; }
 async function say(text, mood, token) {
