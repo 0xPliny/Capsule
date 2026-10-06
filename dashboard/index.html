@@ -348,7 +348,7 @@
 <div id="desk-pet" data-holder-risk="ok" role="button" tabindex="0" aria-label="Poke the desk spider">
   <svg id="pet-svg" viewBox="-70 -70 140 140" width="140" height="140">
     <defs>
-      <radialGradient id="abdFill" cx="34%" cy="30%" r="72%">
+      <radialGradient id="abdFill" cx="50%" cy="28%" r="72%">
         <stop offset="0" stop-color="#D8FFE9"/>
         <stop offset=".28" stop-color="#7EE0AA"/>
         <stop offset=".62" stop-color="#4FCB86"/>
@@ -374,15 +374,15 @@
     <g id="pet-facing">
       <g id="pet-legs"></g>
       <g id="pet-bob">
-        <g id="spider-body">
-          <ellipse id="pet-abd" cx="-16" cy="4" rx="28" ry="36" fill="url(#abdFill)" stroke="#1F4D3D" stroke-width="1.7"/>
-          <ellipse cx="-28" cy="-12" rx="9" ry="4.5" fill="#F5F0E6" opacity=".72" transform="rotate(-32 -28 -12)"/>
-          <ellipse cx="-6" cy="18" rx="12" ry="6" fill="#F5F0E6" opacity=".22"/>
+        <g id="spider-body" transform="translate(-24,0)">
+          <ellipse id="pet-abd" cx="24" cy="22" rx="22" ry="20" fill="url(#abdFill)" stroke="#1F4D3D" stroke-width="1.7"/>
+          <ellipse cx="16" cy="12" rx="8" ry="4" fill="#F5F0E6" opacity=".72"/>
+          <ellipse cx="24" cy="30" rx="10" ry="5" fill="#F5F0E6" opacity=".22"/>
           <path d="M9,-14 L9,8 A15,15 0 0 0 39,8 L39,-14 A15,15 0 0 0 9,-14 Z" fill="url(#pillEm)" stroke="#1F4D3D" stroke-width="1.7"/>
           <path d="M9,-3 L9,-14 A15,15 0 0 1 39,-14 L39,-3 Z" fill="url(#pillCream)"/>
-          <ellipse cx="6" cy="12" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(58 6 12)"/>
-          <ellipse cx="44" cy="10" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(-36 44 10)"/>
-          <ellipse cx="20" cy="-20" rx="7" ry="3.1" fill="#FFFFFF" opacity=".78" transform="rotate(-28 20 -20)"/>
+          <ellipse cx="9" cy="14" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(48 9 14)"/>
+          <ellipse cx="39" cy="14" rx="9" ry="4.6" fill="url(#palpFill)" stroke="#1F4D3D" stroke-width="1.25" transform="rotate(-48 39 14)"/>
+          <ellipse cx="24" cy="-22" rx="7" ry="3.1" fill="#FFFFFF" opacity=".78"/>
           <ellipse class="pet-blush" cx="13.6" cy="-5.6" rx="3.0" ry="2.0" fill="#FFB4C0" opacity=".85"/>
           <ellipse class="pet-blush" cx="34.4" cy="-5.6" rx="3.0" ry="2.0" fill="#FFB4C0" opacity=".85"/>
           <g id="pet-eyes">
@@ -770,6 +770,7 @@ function drawEdges() {
 
 // ------------------------------------------------------------- capsule spider: 8-leg desk pet
 // Cream/emerald pill head, solid black oval eyes, thin smile. Roams below the header.
+// Front-on lock: #pet-facing never takes walk yaw. PET.h still aims which feet step.
 // 2-bone IK (hip→knee→foot), alternating groups of 4. prefers-reduced-motion: same bubble-free park, no roam.
 // Click / Enter / Space: hop + wink (~900ms). Reduced motion: wink only. Cooldown 1.5s from start.
 const PET = { x: 0, y: 0, h: 0.2, hT: 0.2, walking: false };
@@ -1013,13 +1014,10 @@ function settleOffChrome() {
   spiderSettled = true;
 }
 function localToWorld(p) {
-  const c = Math.cos(PET.h), s = Math.sin(PET.h);
-  return { x: PET.x + p.x * c - p.y * s, y: PET.y + p.x * s + p.y * c };
+  return { x: PET.x + p.x, y: PET.y + p.y };
 }
 function worldToLocal(p) {
-  const c = Math.cos(PET.h), s = Math.sin(PET.h);
-  const dx = p.x - PET.x, dy = p.y - PET.y;
-  return { x: dx * c + dy * s, y: -dx * s + dy * c };
+  return { x: p.x - PET.x, y: p.y - PET.y };
 }
 function plantVisible() {
   const b = roamBounds();
@@ -1060,10 +1058,10 @@ function buildLegs() {
   const host = $("#pet-legs"); host.innerHTML = "";
   LEGS = [];
   const spec = [
-    { hip: {x: 26, y: 12}, rest: {x: 47, y: 18} },
-    { hip: {x: 6, y: 18}, rest: {x: 14, y: 50} },
-    { hip: {x: -16, y: 22}, rest: {x: -12, y: 50} },
-    { hip: {x: -30, y: 12}, rest: {x: -47, y: 16} },
+    { hip: {x: 16, y: 10}, rest: {x: 40, y: 16} },
+    { hip: {x: 8, y: 18}, rest: {x: 16, y: 46} },
+    { hip: {x: -8, y: 18}, rest: {x: -16, y: 46} },
+    { hip: {x: -16, y: 10}, rest: {x: -40, y: 16} },
   ];
   [-1, 1].forEach(side => spec.forEach((sp, i) => {
     const g = el("g", {class: "leg"}, host);
@@ -1414,7 +1412,6 @@ function renderSpider(now) {
   if (Math.hypot(PET.x - prevX, PET.y - prevY) > 12) plantFeet();
   PET.h += angDiff(PET.h, PET.hT) * Math.min(1, dt * (PET.walking ? 0.016 : 0.005));
   placeHost();
-  $("#pet-facing").setAttribute("transform", `rotate(${(PET.h * 180 / Math.PI).toFixed(2)})`);
   if (!reacting) {
     let bob = 0, hop = 0;
     if (!REDUCED) {
@@ -1444,6 +1441,7 @@ function renderSpider(now) {
 }
 function bootSpider() {
   bindSpiderHit();
+  $("#pet-facing").removeAttribute("transform");
   buildLegs();
   plantVisible();
   plantFeet();
