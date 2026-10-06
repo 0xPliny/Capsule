@@ -12,7 +12,7 @@
 
 ### A live, visual dry-run desk for [pump.fun](https://pump.fun)
 
-`status` &nbsp;🟢 **Shipping** &nbsp;&nbsp; `version` &nbsp;📦 **0.3.0** &nbsp;&nbsp; `license` &nbsp;📄 **Apache-2.0** &nbsp;&nbsp; `mode` &nbsp;🧪 **Dry-run only**
+`status` &nbsp;🟢 **Shipping** &nbsp;&nbsp; `version` &nbsp;📦 **0.4.0** &nbsp;&nbsp; `license` &nbsp;📄 **Apache-2.0** &nbsp;&nbsp; `mode` &nbsp;🧪 **Dry-run only**
 
 ### Built by **[0xPliny](https://x.com/0xPliny)** · tips welcome on X
 
@@ -32,11 +32,13 @@
 - **Public pump.fun data** — coins, trades, and 1m candles over plain GETs
 - **Offline demo + replay** — `--demo` and `--replay` never need pump.fun or TypeSafe
 - **Paper desk tour** — coin → judgment → gates → action, with a roaming capsule spider
-- **Gate strands** — green PASS / red FAIL on toxic flow, quote environment, liquidity, inventory, each with its own reason
+- **Gate strands** — green PASS / red FAIL on flow, quote environment, liquidity, inventory, and holder cluster, each with its own reason
+- **Holder cluster (paper)** — linked holders, shared funder, and same-block buys. `holder_risk.verdict` is `OK`, `RISKY`, or `DANGER` only after a finished read. `OK` means no elevated cluster, not a buy clearance. Missing rows set `state` to `error` and omit the verdict. Demo / try-sample logs are tagged `SAMPLE`
 - **Evidence panel** — per gate: source, endpoint, fetch time, decision time, snapshot hash, field, threshold, value, distance to the line, and what would flip it
 - **Fail closed** — a failed GET, a timeout, a stale print, or a missing field does not produce a confident intent. The desk says **insufficient data** and names the source and endpoint
 - **CA → pump.fun** — mint links open the coin page when a mint is present
 - **Header actions** — [Tips](https://x.com/0xPliny) · [GitHub](https://github.com/0xPliny/Capsule) · [X](https://x.com/0xPliny)
+- **Phase 4 paper desk** — local watchlist, an optional watch loop, and a paper scoreboard. Still no trades. `live_order` stays `false`
 - **Apache-2.0** — use it, fork it, build on it; keep secrets out of the repo
 
 ---
@@ -56,6 +58,10 @@ python desk.py --pump              # latest bonding-curve coin (public GETs)
 python desk.py --mint <MINT>       # one specific coin (public GETs)
 python desk.py --demo              # offline fake snapshot + canned judgment
 python desk.py --replay tests/fixtures/replay_paper_long.jsonl
+python desk.py --watch-add <MINT>  # save a mint locally (no network, no order)
+python desk.py --watch-list
+python desk.py --watch --passes 1  # refresh saved mints, append Decisions, no orders
+python desk.py --demo --watch --passes 1   # same loop, fully offline
 
 python dashboard/server.py         # local UI at http://127.0.0.1:8791/
 ```
@@ -83,7 +89,10 @@ The script does not take a trade, does not read a key, and does not listen on an
 | Score the latest curve coin | `python desk.py --pump` |
 | Score a mint I already have | `python desk.py --mint <MINT>` |
 | Demo with no network / no API key | `python desk.py --demo` |
+| Try the offline sample mint | `python desk.py --demo` or `python desk.py --replay tests/fixtures/sample_mint.json` |
 | Replay a stored Decision / snapshot | `python desk.py --replay <path.jsonl\|snapshot.json>` |
+| Save or drop a watched mint | `python desk.py --watch-add <MINT>` / `--watch-remove <MINT>` |
+| Refresh the watchlist once | `python desk.py --watch --passes 1` |
 | Run the safety + gate tests | `pip install -r requirements-dev.txt && pytest` |
 | Tip the author | [x.com/0xPliny](https://x.com/0xPliny) |
 
@@ -93,9 +102,26 @@ The script does not take a trade, does not read a key, and does not listen on an
 
 1. Build a compact market snapshot from a **source**: live pump.fun GETs (`--pump` / `--mint`), the offline demo, or a recorded file (`--replay`).
 2. Ask six questions (live TypeSafe / Jev on `--pump` / `--mint`; canned or stored judgment offline): regime, direction, toxic flow, liquidity, quote environment, inventory.
-3. Evaluate **all** declarative gates from `thresholds.json` (`default_v1`). Each gate records the field, the threshold, the value, the signed distance to that line, a reason, and what would flip it. Intent policy is still inventory → toxic → quote_env → liquidity → direction → `paper_long` / `paper_short` / hold / flatten — **never** a live order.
+3. Evaluate **all** declarative gates from `thresholds.json` (`default_v1`). Each gate records the field, the threshold, the value, the signed distance to that line, a reason, and what would flip it. Intent policy is inventory → toxic_flow → quote_env → liquidity → holder_cluster → direction → `paper_long` / `paper_short` / hold / flatten — **never** a live order. `holder_cluster` passes only when the score is **below 0.35**. That band is `holder_risk` **OK**. From 0.35 up to 0.60 is **RISKY**. 0.60 and above is **DANGER**. Both block paper intent. The score is the strongest of shared-funder, same-block, and linked-holder ratios (0 = none, 1 = the whole set). Holder rows come from a public Solana JSON-RPC read (`getTokenLargestAccounts`, `getMultipleAccounts`, `getSignaturesForAddress`, `getTransaction` on `https://api.mainnet-beta.solana.com`) or from the offline sample bundle. No trade methods, no keys.
 4. If a required GET fails or times out, the coin's last trade is older than 15 minutes (`900s`), or a gate field is missing, the intent is `hold` with `confident: false` and a reason that starts `insufficient data:` and names the source and endpoint. Candle HTTP misses are shown on the evidence panel and do not by themselves block a decision that already has price and trades. A candle timeout does block.
-5. Log a versioned Decision (`schema_v` **2**, `run_id`, `ts`, `source`, `mint`, `snapshot`, `snapshot_hash`, `endpoints`, `judgment`, per-gate evidence, `intent`, `data_status`, `threshold_set_id`) to `data/decisions.jsonl` (gitignored). Older `schema_v` 1 rows still replay. The dashboard lists every gate, not only the first failure.
+5. Log a versioned Decision (`schema_v` **2**, `run_id`, `ts`, `source`, `mint`, `snapshot`, `snapshot_hash`, `endpoints`, `judgment`, per-gate evidence, `intent`, `data_status`, `threshold_set_id`, `holder_risk`) to `data/decisions.jsonl` (gitignored). `holder_risk` is `verdict` (`OK` | `RISKY` | `DANGER`, or null when the read failed), optional `score` 0–100, `reason`, `state` (`done` or `error`), `sample_ca`, `is_sample`, `no_cluster`, optional `top10_pct` / `max_pct` (integers 0–100, omitted when missing or out of range), and `log` (`ts`, `level`, `message`). `no_cluster` is true only when a finished OK check found no shared-funder, same-block, or linked group. Frontend can show the no-cluster line only when `no_cluster === true` and `top10_pct` is in 0..100. A found cluster sets `no_cluster` false, including a small cluster that is still OK. Errors set `no_cluster` false and omit the verdict. Real reads log what the RPC did. Demo and the sample fixture tag every line `SAMPLE`. Name, symbol, mint, reason, and log text are stored as plain text. Older `schema_v` 1 rows still replay. The dashboard lists every gate, not only the first failure. Gate numbers are tagged **observed** (the print), **derived** (the distance), or **cited** (the threshold). A missing number is marked **insufficient**.
+6. Record a paper mark beside that decision: snapshot price and time in, and after the horizon (default 5 minutes) a later print fills the paper delta. No price means no delta. The watchlist lives in `data/watchlist.json`. `--watch` only refreshes saved mints (or `--demo` / one `--mint`) and appends Decisions. It never sends an order.
+
+The offline sample mint is `PaperDemoMint111111111111111111111111111` (`holder_risk.sample_ca`). `--demo` and `tests/fixtures/sample_mint.json` both resolve it with no network.
+
+---
+
+## Phase 4 · paper product
+
+This release is still a dry-run. It does **not** connect a key, does **not** post a trade, and does **not** turn `live_order` on.
+
+| Piece | What it does |
+| --- | --- |
+| Watchlist | `desk.py --watch-add`, `--watch-remove`, `--watch-list`, and the same list on the local dashboard |
+| Watch loop | `--watch` appends `schema_v` 2 Decisions for the saved mints. `--passes 1` is a single pass. The dashboard timer does the same dry-run refresh |
+| Paper scoreboard | Entry price and time at the decision; the N-minute print records the paper delta. Missing prices stay insufficient |
+| Evidence roles | observed / derived / cited on the numbers the gates already show |
+| Honesty strip | **DRY RUN · PAPER** stays in the header, tips stay on [x.com/0xPliny](https://x.com/0xPliny), and the not-affiliated line stays |
 
 <p align="center">
   <img src="docs/capsule-mascot.png" alt="Capsule mascot poses" width="440" />
@@ -108,6 +134,7 @@ The script does not take a trade, does not read a key, and does not listen on an
 - Never commit API keys, wallets, `.env`, or machine paths.
 - Set `TYPESAFE_API_KEY` in the environment only.
 - This product does **not** place trades. Unlocking live trading is a separate, explicit decision.
+- Holder reads are public JSON-RPC account lookups (read methods only). They are not orders. `live_order` stays false. A holder `OK` is not a clearance to buy.
 
 ---
 
@@ -139,7 +166,7 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
 
 <div align="center">
 
-**Status: Shipping** &nbsp;·&nbsp; **Version 0.3.0** &nbsp;·&nbsp; **Dry-run · live_order false**
+**Status: Shipping** &nbsp;·&nbsp; **Version 0.4.0** &nbsp;·&nbsp; **Dry-run · live_order false**
 
 *Fan desk for pump.fun. Not Pump. Stay safe.*
 

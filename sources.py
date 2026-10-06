@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
 
+from holders import SAMPLE_CA, fetch_holder_rows, plain_ca, sample_holder_bundle
+
 PUMP_FRONTEND = "https://frontend-api-v3.pump.fun"
 PUMP_SWAP = "https://swap-api.pump.fun"
 UA = {"User-Agent": "Mozilla/5.0 (Capsule dry-run)", "Accept": "application/json"}
@@ -134,6 +136,9 @@ def demo_snapshot() -> dict:
         "mode": "dry_run",
         "max_risk_usd": 200,
         "take_usd": 400,
+        "mint": SAMPLE_CA,
+        "coin": {"mint": SAMPLE_CA, "name": "Demo", "symbol": "DEMO-PERP"},
+        "holders": sample_holder_bundle(),
     }
 
 
@@ -223,6 +228,14 @@ def pick_active_mint(endpoints: list | None = None) -> str:
     return coins[0]["mint"]
 
 
+def _holder_bundle(mint: str, endpoints: list, supply) -> dict:
+    """Public holder read. A failed read stays on the snapshot so the gate can fail closed."""
+    bundle = fetch_holder_rows(mint, endpoints)
+    if supply:
+        bundle["supply"] = supply
+    return bundle
+
+
 def pump_snapshot(mint: str | None = None, source_id: str = "pump") -> dict:
     """Compact snapshot in the same shape as demo_snapshot(), built from pump.fun public data.
 
@@ -231,7 +244,15 @@ def pump_snapshot(mint: str | None = None, source_id: str = "pump") -> dict:
     price impact of a $100 clip, imbalance = buy/sell USD imbalance of recent trades.
     """
     endpoints: list = []
-    mint = mint or pick_active_mint(endpoints)
+    # Mint text is untrusted. Keep it base58 before it touches a URL.
+    if mint:
+        mint = plain_ca(mint)
+        if not mint:
+            raise FetchError("error", PUMP_FRONTEND, "mint missing", endpoints)
+    else:
+        mint = plain_ca(pick_active_mint(endpoints))
+        if not mint:
+            raise FetchError("error", PUMP_FRONTEND, "mint missing", endpoints)
     coin_url = f"{PUMP_FRONTEND}/coins-v2/{mint}"
     trades_url = f"{PUMP_SWAP}/v2/coins/{mint}/trades?limit=100&cursor=0&minSolAmount=0"
     candles_url = f"{PUMP_SWAP}/v1/coins/{mint}/candles?interval=1m&limit=60&currency=USD"
@@ -365,6 +386,7 @@ def pump_snapshot(mint: str | None = None, source_id: str = "pump") -> dict:
         "endpoints": endpoints,
         "freshness": freshness,
         "missing_fields": missing,
+        "holders": _holder_bundle(mint, endpoints, supply),
     }
 
 

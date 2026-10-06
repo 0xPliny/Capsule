@@ -1,0 +1,41 @@
+{
+  "ts": "2026-10-06T00:00:00+00:00",
+  "source": "mint",
+  "source_id": "mint",
+  "symbol": "<script>alert(1)</script>",
+  "mint": "Evil<script>alert(1)</script>Mint",
+  "coin": {
+    "name": "<img src=x onerror=alert(1)>",
+    "symbol": "[click](javascript:alert(1))",
+    "mint": "So111<script>;|&$`</script>"
+  },
+  "holders": {
+    "rows": [
+      {
+        "owner": "OwnerAhostile111111111111111111111111",
+        "funder": "<script>alert(1)</script>",
+        "slot": 1,
+        "amount": 5
+      },
+      {
+        "owner": "OwnerBhostile111111111111111111111111",
+        "funder": "<script>alert(1)</script>",
+        "slot": 2,
+        "amount": 5
+      },
+      {
+        "owner": "OwnerChostile111111111111111111111111",
+        "funder": "<script>alert(1)</script>",
+        "slot": 3,
+        "amount": 5
+      }
+    ],
+    "supply": 100,
+    "endpoint": "offline:hostile",
+    "observed": true,
+    "sample": false
+  },
+  "mode": "dry_run",
+  "max_risk_usd": 200,
+  "take_usd": 400
+}

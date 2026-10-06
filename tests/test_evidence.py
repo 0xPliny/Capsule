@@ -114,7 +114,11 @@ def test_fetch_timeout_blocks_confident_intent(demo_snapshot, passing_judgment):
     assert "source=pump" in out["intent"]["reason"]
     assert endpoint in out["intent"]["reason"]
     assert "timeout" in out["intent"]["reason"]
-    assert all(g["endpoint"] == endpoint for g in out["gates"])
+    for gate in out["gates"]:
+        if gate["name"] == "holder_cluster":
+            assert gate["endpoint"] == "offline:sample-holders"
+        else:
+            assert gate["endpoint"] == endpoint
     assert all(g["flip"].startswith("no confident intent") for g in out["gates"])
 
 
@@ -204,6 +208,26 @@ def _fake_pump(monkeypatch, coin, trades=None, candles=None, fail=None):
         raise AssertionError(url)
 
     monkeypatch.setattr("sources._get_json", fake)
+
+    def _holders(mint, endpoints=None, transport=None):
+        rows = []
+        for i in range(8):
+            rows.append({
+                "owner": f"Owner{i}Evidence11111111111111111111",
+                "funder": f"Funder{i}Evidence1111111111111111111",
+                "slot": 5000 + i,
+                "amount": 1,
+            })
+        return {
+            "rows": rows,
+            "supply": 100,
+            "endpoint": "offline:test-holders",
+            "observed": True,
+            "sample": False,
+            "log": [],
+        }
+
+    monkeypatch.setattr("sources.fetch_holder_rows", _holders)
 
 
 def test_pump_timeout_names_coins_endpoint(monkeypatch, passing_judgment):
@@ -347,7 +371,7 @@ def test_demo_cycle_is_confident_and_offline():
     assert row["intent"]["confident"] is True
     assert row["endpoints"][0]["name"] == "demo"
     assert row["snapshot_hash"] == canonical_hash(row["snapshot"])
-    assert len(row["gates"]) == 4
+    assert len(row["gates"]) == 5
     assert all(g["passed"] for g in row["gates"])
 
 
@@ -358,7 +382,8 @@ def test_dashboard_row_keeps_every_gate(demo_snapshot, passing_judgment):
         decided=decided, elapsed_ms=1, fetch_ms=0,
     )
     view = dash_server.dashboard_row(row)
-    assert isinstance(view["gates"], list) and len(view["gates"]) == 4
+    assert isinstance(view["gates"], list) and len(view["gates"]) == 5
+    assert view["holder_risk"]["verdict"] in ("OK", "RISKY", "DANGER")
     assert all(g.get("reason") and "flip" in g for g in view["gates"])
     assert view["decision"]["gates"]["inventory"] is True
     assert view["decision"]["gates"]["toxic_flow"] is True
