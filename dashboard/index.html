@@ -482,6 +482,12 @@
 
 <script>
 const $ = (s) => document.querySelector(s);
+function setStatus(text) {
+  const el = $("#status");
+  const s = String(text ?? "");
+  el.textContent = s;
+  el.title = s;
+}
 const esc = (v) => String(v ?? "—").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const px = (v) => v == null ? "—" : (Math.abs(v) < 0.01 ? Number(v).toPrecision(4) : Number(v).toLocaleString(undefined,{maximumFractionDigits:6}));
 const usd = (v) => v == null ? "—" : "$" + Number(v).toLocaleString(undefined,{maximumFractionDigits:2});
@@ -1722,8 +1728,8 @@ async function refresh(forceTour) {
     const ts = latest.row && latest.row.ts;
     if (forceTour || ts !== lastTs) { lastTs = ts; tour(latest.row); }
     $("#stage").classList.toggle("busy", !!latest.running || $("#run").disabled);
-    if (latest.running) $("#status").textContent = "dry-run cycle running…";
-  } catch (e) { $("#status").textContent = "dashboard fetch error: " + e; }
+    if (latest.running) setStatus("dry-run cycle running…");
+  } catch (e) { setStatus("dashboard fetch error: " + e); }
 }
 
 $("#watch-form").addEventListener("submit", async (ev) => {
@@ -1733,47 +1739,47 @@ $("#watch-form").addEventListener("submit", async (ev) => {
   try {
     await postJson("/api/watchlist", {op:"add", mint});
     $("#watch-mint").value = "";
-    $("#status").textContent = "watchlist saved · DRY RUN · PAPER · live_order false";
+    setStatus("watchlist saved · DRY RUN · PAPER · live_order false");
     await refresh(false);
-  } catch (e) { $("#status").textContent = "watchlist: " + e.message; }
+  } catch (e) { setStatus("watchlist: " + e.message); }
 });
 $("#watch-list").addEventListener("click", async (ev) => {
   const btn = ev.target.closest(".watch-remove");
   if (!btn) return;
   try {
     await postJson("/api/watchlist", {op:"remove", mint: btn.getAttribute("data-mint")});
-    $("#status").textContent = "watchlist updated · DRY RUN · PAPER · live_order false";
+    setStatus("watchlist updated · DRY RUN · PAPER · live_order false");
     await refresh(false);
-  } catch (e) { $("#status").textContent = "watchlist: " + e.message; }
+  } catch (e) { setStatus("watchlist: " + e.message); }
 });
 $("#watch-once").addEventListener("click", async () => {
   const b = $("#watch-once"); b.disabled = true;
-  $("#status").textContent = "paper watch pass (dry-run, no orders)…";
+  setStatus("paper watch pass (dry-run, no orders)…");
   try {
     const j = await postJson("/api/watch");
-    $("#status").textContent = `paper watch · appended ${j.appended} · live_order ${j.live_order}`;
+    setStatus(`paper watch · appended ${j.appended} · live_order ${j.live_order}`);
     await refresh(true);
-  } catch (e) { $("#status").textContent = "paper watch: " + e.message; }
+  } catch (e) { setStatus("paper watch: " + e.message); }
   b.disabled = false;
 });
 let watchTimer = null;
 $("#watch-timer").addEventListener("change", (ev) => {
   if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
   if (!ev.target.checked) {
-    $("#status").textContent = "paper timer off · DRY RUN · PAPER";
+    setStatus("paper timer off · DRY RUN · PAPER");
     return;
   }
-  $("#status").textContent = "paper timer on · DRY RUN · PAPER · no orders";
+  setStatus("paper timer on · DRY RUN · PAPER · no orders");
   watchTimer = setInterval(() => { $("#watch-once").click(); }, 60000);
 });
 
 $("#run").addEventListener("click", async () => {
-  const b = $("#run"); b.disabled = true; $("#status").textContent = "running desk.py --pump (dry-run)…"; $("#stage").classList.add("busy");
+  const b = $("#run"); b.disabled = true; setStatus("running desk.py --pump (dry-run)…"); $("#stage").classList.add("busy");
   tourToken++; TOUR.walking = false; say("> spawning fresh dry-run cycle… crawling", "", tourToken);
   try {
     const r = await fetch("/api/run", {method:"POST"}); const j = await r.json();
-    $("#status").textContent = j.ok ? `done in ${j.wall_ms} ms · live_order ${j.live_order}` : `error: ${j.error || j.stderr_tail || "rc " + j.returncode}`;
-  } catch (e) { $("#status").textContent = "error: " + e; }
+    setStatus(j.ok ? `done in ${j.wall_ms} ms · live_order ${j.live_order}` : `error: ${j.error || j.stderr_tail || "rc " + j.returncode}`);
+  } catch (e) { setStatus("error: " + e); }
   b.disabled = false; $("#stage").classList.remove("busy"); await refresh(true);
 });
 
